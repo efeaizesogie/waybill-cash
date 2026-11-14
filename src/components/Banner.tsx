@@ -20,8 +20,11 @@ export function Banner() {
         <a href={SLIDES_URL} target="_blank" rel="noreferrer">Slides</a>
         <a href={REPO_URL} target="_blank" rel="noreferrer">Repo</a>
         <span className="banner-vote">
-          EMBER2026 votes: <span className="banner-addr">{EMBER_ADDRESS}</span>{' '}
-          <button type="button" className="banner-copy" onClick={copy}>
+          EMBER2026 votes:{' '}
+          <span className="banner-addr" title={EMBER_ADDRESS} aria-label={EMBER_ADDRESS}>
+            {EMBER_ADDRESS.split(':')[1].slice(0, 6)}…{EMBER_ADDRESS.slice(-5)}
+          </span>{' '}
+          <button type="button" className="banner-copy" onClick={copy} aria-label="Copy the full EMBER2026 vote address">
             {copied ? 'Copied' : 'Copy'}
           </button>
         </span>
