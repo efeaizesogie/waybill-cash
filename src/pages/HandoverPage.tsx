@@ -1,21 +1,16 @@
 import { useMemo, useState } from 'react';
-import { decodeOrder, decodeSecret, secretMatches } from '../lib/waybill';
+import { type Order, secretMatches } from '../lib/waybill';
 import { useStatus } from '../lib/useStatus';
 import { release, explorerTx } from '../lib/chain';
 import { Ticket } from '../components/Ticket';
 import { formatBch } from '../lib/price';
 
 /** Opened by scanning the buyer's code at the door. Anyone may press the button; the money can only go to the seller. */
-export function HandoverPage({ code, secret }: { code: string; secret: string }) {
-  const parsed = useMemo(() => {
-    try {
-      const order = decodeOrder(code);
-      const bin = decodeSecret(secret);
-      return { order, bin, valid: secretMatches(order, bin) };
-    } catch {
-      return null;
-    }
-  }, [code, secret]);
+export function HandoverPage({ order: routeOrder, secret }: { order: Order | null; secret: Uint8Array | null }) {
+  const parsed = useMemo(
+    () => (routeOrder && secret ? { order: routeOrder, bin: secret, valid: secretMatches(routeOrder, secret) } : null),
+    [routeOrder, secret],
+  );
   const order = parsed?.order ?? null;
   const { status, refresh } = useStatus(order);
   const [busy, setBusy] = useState(false);

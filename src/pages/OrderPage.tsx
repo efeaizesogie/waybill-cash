@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
-import { decodeOrder, decodeSecret, secretMatches } from '../lib/waybill';
+import { decodeOrder, decodeSecret, secretMatches, encodeHandover } from '../lib/waybill';
+import { useWallet } from '../lib/walletContext';
 import { secretFor } from '../lib/store';
 import { useStatus } from '../lib/useStatus';
 import { refund, explorerTx } from '../lib/chain';
@@ -18,6 +19,7 @@ export function OrderPage({ code }: { code: string }) {
     }
   }, [code]);
   const order = parsed.order ?? null;
+  const { openScanner } = useWallet();
   const { status, refresh } = useStatus(order);
   const secret = useMemo(() => {
     if (!order) return undefined;
@@ -42,7 +44,8 @@ export function OrderPage({ code }: { code: string }) {
   }
 
   const sellerLink = `${pageBase()}#/o/${code}`;
-  const handoverLink = secret ? `${pageBase()}#/h/${code}/${secret}` : '';
+  const handoverPath = secret && order ? `#/x/${encodeHandover(order, decodeSecret(secret))}` : '';
+  const handoverLink = handoverPath ? `${pageBase()}${handoverPath}` : '';
   const isBuyer = !!secret;
   const kind = status.kind;
   const height = status.kind === 'locked' ? status.height : undefined;
@@ -107,11 +110,12 @@ export function OrderPage({ code }: { code: string }) {
               </>
             ) : (
               <>
-                <Qr value={handoverLink} label="Handover code. Scanning it pays the seller." />
+                <Qr value={handoverLink} size={340} ecc="L" label="Handover code. Scanning it pays the seller." />
                 <p className="stub-lead">Scanning this pays the seller {formatBch(Number(status.utxo.satoshis) - 500)}. Only show it once you have the parcel.</p>
+                <p className="hint">The rider or seller scans it with Waybill's Scan code button or their phone camera app. A wallet's scanner won't open it. Turn your screen brightness up.</p>
                 <div className="stub-actions">
                   <button className="btn btn-quiet" onClick={() => setShowCode(false)}>Hide code</button>
-                  <a className="btn btn-quiet" href={`#/h/${code}/${secret}`}>I have the parcel, pay now</a>
+                  <a className="btn btn-quiet" href={handoverPath}>I have the parcel, pay now</a>
                 </div>
               </>
             )}
@@ -121,7 +125,8 @@ export function OrderPage({ code }: { code: string }) {
         {kind === 'locked' && !isBuyer && (
           <div className="stub-block">
             <p className="stub-lead">The money is locked and can only go to your address. It is paid out when the buyer's code is scanned at delivery.</p>
-            <p className="hint">Scan the buyer's code with your phone camera. It opens this site and pays you in seconds.</p>
+            <button className="btn btn-primary btn-block" onClick={openScanner}>Scan the buyer's code</button>
+            <p className="hint">At the door, scan the QR on the buyer's phone. It opens the handover screen and pays you in seconds. Your phone camera app works too.</p>
           </div>
         )}
 

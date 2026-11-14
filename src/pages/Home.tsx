@@ -6,6 +6,7 @@ import { provider } from '../lib/chain';
 import { buyerIdentity, lockFunds, scanWallet } from '../lib/wallet';
 import { saveOrder, listOrders } from '../lib/store';
 import { binToHex, hash160 } from '@bitauth/libauth';
+import { Guide } from '../components/Guide';
 
 const WINDOWS = [
   { blocks: 12, label: '2 hours (demo)' },
@@ -110,6 +111,7 @@ export function Home() {
           <p className="lead">
             Lock BCH for an order. The seller is paid the moment you show your code at the door. No delivery, the money comes back to you.
           </p>
+          <a className="hero-setup" href="#setup" onClick={(e) => { e.preventDefault(); document.getElementById('setup')?.scrollIntoView({ behavior: 'smooth' }); }}>New to BCH? Set up a wallet in 2 minutes</a>
         </div>
 
         <form className="panel order-form" onSubmit={submit} noValidate>
@@ -222,6 +224,8 @@ export function Home() {
           </li>
         </ol>
       </section>
+
+      <Guide />
     </>
   );
 }

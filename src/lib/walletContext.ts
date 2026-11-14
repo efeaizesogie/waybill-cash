@@ -6,6 +6,7 @@ type Wc = ReturnType<typeof useWizardConnect>;
 export interface WalletCtx extends Wc {
   net: Net;
   openConnect: () => void;
+  openScanner: () => void;
 }
 
 export const WalletContext = createContext<WalletCtx | null>(null);

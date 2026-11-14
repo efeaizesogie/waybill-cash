@@ -136,3 +136,25 @@ describe('links', () => {
     expect(a.startsWith('bchtest:p')).toBe(true);
   });
 });
+
+describe('compact handover link', () => {
+  it('rebuilds the same contract and secret, and stays short', async () => {
+    const { encodeHandover, decodeHandover } = await import('../src/lib/waybill');
+    const code = encodeHandover({ ...order, item: 'Ankara two-piece, size M, with matching headwrap' }, secret);
+    expect(code.length).toBeLessThan(140);
+    const back = decodeHandover(code);
+    expect(back.order.net).toBe(order.net);
+    expect(back.order.sats).toBe(order.sats);
+    expect(back.order.refundAfter).toBe(order.refundAfter);
+    expect(back.order.releaseHash).toBe(order.releaseHash);
+    expect(makeContract(back.order, provider).address).toBe(makeContract(order, provider).address);
+    expect(back.order.item.endsWith('…')).toBe(true);
+    expect(secretMatches(back.order, back.secret)).toBe(true);
+  });
+
+  it('handles large amounts', async () => {
+    const { encodeHandover, decodeHandover } = await import('../src/lib/waybill');
+    const big = { ...order, sats: 21_000_000 * 1e8 };
+    expect(decodeHandover(encodeHandover(big, secret)).order.sats).toBe(big.sats);
+  });
+});

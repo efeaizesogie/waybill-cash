@@ -139,3 +139,53 @@ export function secretMatches(order: Order, secret: Uint8Array) {
 }
 
 export { cashAddressToLockingBytecode, lockingBytecodeToCashAddress, binToHex, hexToBin };
+
+// ---------- compact handover link ----------
+// The handover QR must be easy to scan off a phone screen, so it carries only what is needed
+// to rebuild the contract and settle: ~95 bytes instead of the ~450-char JSON order link.
+// Layout: ver(1) net(1) buyerPkh(20) sellerPkh(20) refundAfter(u32) maxFee(u16) sats(u64) secret(16) item(utf8, ≤24 bytes)
+
+const ITEM_MAX = 24;
+
+function clipUtf8(text: string, max: number) {
+  let bin = utf8ToBin(text);
+  if (bin.length <= max) return bin;
+  let t = text;
+  while (utf8ToBin(t).length > max - 3) t = t.slice(0, -1);
+  bin = utf8ToBin(t + '…');
+  return bin;
+}
+
+export function encodeHandover(order: Order, secret: Uint8Array): string {
+  const item = clipUtf8(order.item, ITEM_MAX);
+  const buf = new Uint8Array(1 + 1 + 20 + 20 + 4 + 2 + 8 + 16 + item.length);
+  const dv = new DataView(buf.buffer);
+  let o = 0;
+  buf[o++] = 2;
+  buf[o++] = order.net === 'mainnet' ? 0 : 1;
+  buf.set(hexToBin(order.buyerPkh), o); o += 20;
+  buf.set(hexToBin(order.sellerPkh), o); o += 20;
+  dv.setUint32(o, order.refundAfter); o += 4;
+  dv.setUint16(o, order.maxFee); o += 2;
+  dv.setBigUint64(o, BigInt(order.sats)); o += 8;
+  buf.set(secret, o); o += 16;
+  buf.set(item, o);
+  return b64url(buf);
+}
+
+export function decodeHandover(code: string): { order: Order; secret: Uint8Array } {
+  const buf = fromB64url(code);
+  if (buf.length < 72 || buf[0] !== 2) throw new Error('This handover code is broken.');
+  const dv = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+  let o = 1;
+  const net: Net = buf[o++] === 0 ? 'mainnet' : 'chipnet';
+  const buyerPkh = binToHex(buf.slice(o, o + 20)); o += 20;
+  const sellerPkh = binToHex(buf.slice(o, o + 20)); o += 20;
+  const refundAfter = dv.getUint32(o); o += 4;
+  const maxFee = dv.getUint16(o); o += 2;
+  const sats = Number(dv.getBigUint64(o)); o += 8;
+  const secret = buf.slice(o, o + 16); o += 16;
+  const item = binToUtf8(buf.slice(o)) || 'Order';
+  const order: Order = { v: 1, net, buyerPkh, sellerPkh, releaseHash: hashSecret(secret), refundAfter, maxFee, sats, item, created: 0 };
+  return { order, secret };
+}

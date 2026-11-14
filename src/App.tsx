@@ -1,6 +1,8 @@
 import { useEffect, useState, useCallback } from 'react';
-import { useWizardConnect, WizardConnectQRDialog } from '@wizardconnect/react';
-import { type Net } from './lib/waybill';
+import { useWizardConnect } from '@wizardconnect/react';
+import { type Net, type Order, decodeOrder, decodeSecret, decodeHandover } from './lib/waybill';
+import { ConnectDialog } from './components/ConnectDialog';
+import { Scanner } from './components/Scanner';
 import { Banner } from './components/Banner';
 import { Home } from './pages/Home';
 import { OrderPage } from './pages/OrderPage';
@@ -10,12 +12,28 @@ import { WalletContext } from './lib/walletContext';
 type Route =
   | { name: 'home' }
   | { name: 'order'; code: string }
-  | { name: 'handover'; code: string; secret: string };
+  | { name: 'handover'; order: Order | null; secret: Uint8Array | null };
 
 function parseRoute(hash: string): Route {
   const parts = hash.replace(/^#\/?/, '').split('/');
   if (parts[0] === 'o' && parts[1]) return { name: 'order', code: parts[1] };
-  if (parts[0] === 'h' && parts[1] && parts[2]) return { name: 'handover', code: parts[1], secret: parts[2] };
+  // Short handover link (what the QR carries now)
+  if (parts[0] === 'x' && parts[1]) {
+    try {
+      const { order, secret } = decodeHandover(parts[1]);
+      return { name: 'handover', order, secret };
+    } catch {
+      return { name: 'handover', order: null, secret: null };
+    }
+  }
+  // Long handover link (older orders)
+  if (parts[0] === 'h' && parts[1] && parts[2]) {
+    try {
+      return { name: 'handover', order: decodeOrder(parts[1]), secret: decodeSecret(parts[2]) };
+    } catch {
+      return { name: 'handover', order: null, secret: null };
+    }
+  }
   return { name: 'home' };
 }
 
@@ -38,18 +56,35 @@ export default function App() {
     sessionKey: 'waybill-wizardconnect',
   });
   const [showQr, setShowQr] = useState(false);
+  const [scanning, setScanning] = useState(false);
+  const openScanner = useCallback(() => setScanning(true), []);
+  const closeScanner = useCallback(() => setScanning(false), []);
+  // A stale saved session can sit in "connecting" with no QR to show. Tapping Connect then
+  // drops it and starts a fresh pairing once the hook is back to idle.
+  const [freshPending, setFreshPending] = useState(false);
   const connect = useCallback(() => {
-    if (wc.state !== 'connected') {
-      wc.connect();
-      setShowQr(true);
+    if (wc.state === 'connected') return;
+    setShowQr(true);
+    if (wc.state === 'connecting' && wc.uri) return; // pairing QR already up
+    if (wc.state === 'connecting') {
+      setFreshPending(true);
+      void wc.disconnect();
+      return;
     }
+    wc.connect();
   }, [wc]);
+  useEffect(() => {
+    if (freshPending && (wc.state === 'idle' || wc.state === 'disconnected')) {
+      setFreshPending(false);
+      wc.connect();
+    }
+  }, [freshPending, wc]);
   useEffect(() => {
     if (wc.state === 'connected') setShowQr(false);
   }, [wc.state]);
 
   return (
-    <WalletContext.Provider value={{ ...wc, net: NET, openConnect: connect }}>
+    <WalletContext.Provider value={{ ...wc, net: NET, openConnect: connect, openScanner }}>
       <Banner />
       <header className="topbar container">
         <a href="#/" className="wordmark" aria-label="Waybill home">
@@ -62,13 +97,14 @@ export default function App() {
         </a>
         <div className="topbar-right">
           {NET === 'chipnet' && <span className="net-tag">Chipnet test coins</span>}
+          <button className="btn btn-quiet topbar-scan" onClick={openScanner}>Scan code</button>
           {wc.state === 'connected' ? (
             <button className="btn btn-quiet" onClick={() => wc.disconnect()} title="Disconnect wallet">
               {wc.walletName ?? 'Wallet'} connected
             </button>
           ) : (
             <button className="btn btn-quiet" onClick={connect}>
-              {wc.state === 'connecting' ? 'Waiting for wallet' : 'Connect wallet'}
+              {wc.state === 'connecting' && wc.uri ? 'Waiting for wallet' : 'Connect wallet'}
             </button>
           )}
         </div>
@@ -77,35 +113,20 @@ export default function App() {
       <main>
         {route.name === 'home' && <Home />}
         {route.name === 'order' && <OrderPage code={route.code} />}
-        {route.name === 'handover' && <HandoverPage code={route.code} secret={route.secret} />}
+        {route.name === 'handover' && <HandoverPage order={route.order} secret={route.secret} />}
       </main>
 
-      {wc.uri && wc.qrUri && (
-        <WizardConnectQRDialog
-          show={showQr && wc.state !== 'connected'}
+      {wc.uri && wc.qrUri && showQr && wc.state !== 'connected' && (
+        <ConnectDialog
+          uri={wc.uri}
+          qrUri={wc.qrUri}
           onClose={() => {
             setShowQr(false);
             if (wc.state !== 'connected') wc.disconnect();
           }}
-          uri={wc.uri}
-          qrUri={wc.qrUri}
-          title="Connect your BCH wallet"
-          subtitle="Scan with Paytaca or Cashonize (WizardConnect)"
-          theme={{
-            dialogBackground: '#163300',
-            headerBackground: '#163300',
-            titleColor: '#f1fbe9',
-            subtitleColor: '#c4dcb4',
-            qrForeground: '#163300',
-            qrBackground: '#ffffff',
-            uriRowBackground: 'rgba(255,255,255,0.08)',
-            uriTextColor: '#c4dcb4',
-            borderColor: 'rgba(255,255,255,0.14)',
-            closeButtonColor: '#c4dcb4',
-            copyButtonColor: '#9fe870',
-          }}
         />
       )}
+      {scanning && <Scanner onClose={closeScanner} />}
 
       <footer className="footer container">
         <p>
