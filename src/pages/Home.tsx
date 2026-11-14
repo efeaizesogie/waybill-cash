@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useWallet } from '../lib/walletContext';
 import { type Currency, type Rates, getRates, toSats, formatMoney, formatBch } from '../lib/price';
-import { type Order, newSecret, hashSecret, encodeSecret, pkhFromAddress, netFromAddress, makeContract, MAX_FEE, decodeOrder } from '../lib/waybill';
-import { provider } from '../lib/chain';
-import { buyerIdentity, lockFunds, scanWallet } from '../lib/wallet';
-import { saveOrder, listOrders } from '../lib/store';
+import { pkhFromAddress, netFromAddress, decodeOrder, newRequestId } from '../lib/waybill';
+import { buyerIdentity, scanWallet } from '../lib/wallet';
+import { lockOrder } from '../lib/lock';
+import { listOrders, listRequests, saveRequest } from '../lib/store';
 import { binToHex, hash160 } from '@bitauth/libauth';
 import { Guide } from '../components/Guide';
 
@@ -16,27 +16,121 @@ const WINDOWS = [
 ];
 const MIN_SATS = 2000;
 
-export function Home() {
-  const wallet = useWallet();
+/** Item + price + refund window, shared by both forms. */
+function useOrderFields() {
   const [item, setItem] = useState('');
   const [amount, setAmount] = useState('');
   const [cur, setCur] = useState<Currency>('NGN');
-  const [sellerMode, setSellerMode] = useState<'self' | 'address'>('self');
-  const [sellerAddress, setSellerAddress] = useState('');
-  const [windowBlocks, setWindowBlocks] = useState(12);
+  const [windowBlocks, setWindowBlocks] = useState(144);
   const [rates, setRates] = useState<Rates | null>(null);
-  const [balance, setBalance] = useState<bigint | null>(null);
-  const [busy, setBusy] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
   useEffect(() => {
     getRates().then((r) => {
       setRates(r);
       if (!r) setCur('BCH');
     });
   }, []);
+  const sats = useMemo(() => toSats(parseFloat(amount), cur, rates), [amount, cur, rates]);
+  const tooSmall = sats !== null && sats < MIN_SATS;
+  const price = cur === 'BCH' || !amount ? undefined : formatMoney(parseFloat(amount), cur);
+  const check = (what: string) => {
+    if (!item.trim()) return `Say what ${what}, so the other side recognises the order.`;
+    if (!sats || tooSmall) return `Enter an amount of at least ${formatBch(MIN_SATS)}.`;
+    return null;
+  };
+  const fields = (itemLabel: string, windowLabel: string) => (
+    <>
+      <label className="field">
+        <span>{itemLabel}</span>
+        <input value={item} onChange={(e) => setItem(e.target.value)} placeholder="Ankara two-piece, size M" maxLength={60} required />
+      </label>
+      <div className="field">
+        <label htmlFor="amount">Price</label>
+        <div className="amount-row">
+          <input id="amount" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ''))} placeholder={cur === 'NGN' ? '25000' : cur === 'USD' ? '15' : '0.001'} />
+          <div className="seg" role="radiogroup" aria-label="Currency">
+            {(['NGN', 'USD', 'BCH'] as Currency[]).map((c) => (
+              <button type="button" key={c} role="radio" aria-checked={cur === c} className={cur === c ? 'on' : ''} disabled={c !== 'BCH' && !rates} onClick={() => setCur(c)}>
+                {c === 'NGN' ? '₦' : c === 'USD' ? '$' : 'BCH'}
+              </button>
+            ))}
+          </div>
+        </div>
+        <span className={`hint mono ${tooSmall ? 'hint-bad' : ''}`}>
+          {sats ? `${formatBch(sats)}${tooSmall ? `, below the ${formatBch(MIN_SATS)} minimum` : ''}` : rates ? 'Converted at the live BCH price' : 'Live price unavailable, enter BCH'}
+        </span>
+      </div>
+      <label className="field">
+        <span>{windowLabel}</span>
+        <select value={windowBlocks} onChange={(e) => setWindowBlocks(Number(e.target.value))}>
+          {WINDOWS.map((w) => (
+            <option key={w.blocks} value={w.blocks}>{w.label}</option>
+          ))}
+        </select>
+      </label>
+    </>
+  );
+  return { item, sats, price, windowBlocks, check, fields };
+}
 
+/** Seller creates the waybill and sends the link to the buyer. No wallet connection needed. */
+function SellForm() {
+  const wallet = useWallet();
+  const f = useOrderFields();
+  const [address, setAddress] = useState('');
+  const [error, setError] = useState<string | null>(null);
   const connected = wallet.state === 'connected' && !!wallet.manager;
+
+  function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    const bad = f.check('you are selling');
+    if (bad) return setError(bad);
+    try {
+      if (netFromAddress(address) !== wallet.net) {
+        throw new Error(wallet.net === 'mainnet' ? 'That is a test address. Use your bitcoincash: address.' : 'That is a mainnet address. Use your bchtest: address, or switch to mainnet.');
+      }
+      const code = saveRequest({
+        net: wallet.net,
+        sellerPkh: pkhFromAddress(address),
+        sats: f.sats!,
+        item: f.item.trim(),
+        price: f.price,
+        windowBlocks: f.windowBlocks,
+        rid: newRequestId(),
+      });
+      location.hash = `#/s/${code}`;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  return (
+    <form className="order-form" onSubmit={submit} noValidate>
+      {f.fields('What are you selling?', 'Refund the buyer if not delivered in')}
+      <label className="field">
+        <span>Your BCH address (where you get paid)</span>
+        <input value={address} onChange={(e) => setAddress(e.target.value)} placeholder={wallet.net === 'mainnet' ? 'bitcoincash:q…' : 'bchtest:q…'} spellCheck={false} autoCapitalize="off" />
+        {connected && wallet.manager ? (
+          <button type="button" className="link-btn hint-btn" onClick={() => setAddress(buyerIdentity(wallet.manager!, wallet.net).address)}>Use my connected wallet's address</button>
+        ) : (
+          <span className="hint">In your wallet, tap Receive and copy the address.</span>
+        )}
+      </label>
+      {error && <p className="form-error" role="alert">{error}</p>}
+      <button className="btn btn-primary btn-block" type="submit">Create payment link</button>
+    </form>
+  );
+}
+
+/** The 2-minute demo: one person plays buyer and seller with their own wallet. */
+function TryForm() {
+  const wallet = useWallet();
+  const f = useOrderFields();
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [balance, setBalance] = useState<bigint | null>(null);
+  const connected = wallet.state === 'connected' && !!wallet.manager;
+
   useEffect(() => {
     if (!connected || !wallet.manager) return;
     let alive = true;
@@ -48,51 +142,24 @@ export function Home() {
     };
   }, [connected, wallet.manager, wallet.net]);
 
-  const sats = useMemo(() => toSats(parseFloat(amount), cur, rates), [amount, cur, rates]);
-  const tooSmall = sats !== null && sats < MIN_SATS;
-
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    if (!connected || !wallet.manager) {
-      wallet.openConnect();
-      return;
-    }
-    if (!item.trim()) return setError('Say what you are buying, so the seller recognises the order.');
-    if (!sats || tooSmall) return setError(`Enter an amount of at least ${formatBch(MIN_SATS)}.`);
+    if (!connected || !wallet.manager) return wallet.openConnect();
+    const bad = f.check('you are buying');
+    if (bad) return setError(bad);
     try {
-      const manager = wallet.manager;
-      const buyer = buyerIdentity(manager, wallet.net);
-      let sellerPkh: string;
-      if (sellerMode === 'self') {
-        const pub = manager.getPubkey(0, 1n) ?? manager.getPubkey(0, 0n)!;
-        sellerPkh = binToHex(hash160(pub));
-      } else {
-        if (netFromAddress(sellerAddress) !== wallet.net) throw new Error(`That address is not a ${wallet.net} address.`);
-        sellerPkh = pkhFromAddress(sellerAddress);
-      }
-      setBusy('Reading the chain');
-      const height = await provider(wallet.net).getBlockHeight();
-      const secret = newSecret();
-      const order: Order = {
-        v: 1,
+      const pub = wallet.manager.getPubkey(0, 1n) ?? wallet.manager.getPubkey(0, 0n)!;
+      const code = await lockOrder({
+        manager: wallet.manager,
         net: wallet.net,
-        buyerPkh: buyer.pkh,
-        sellerPkh,
-        releaseHash: hashSecret(secret),
-        refundAfter: height + windowBlocks,
-        maxFee: MAX_FEE,
-        sats,
-        item: item.trim().slice(0, 80),
-        price: cur === 'BCH' ? undefined : formatMoney(parseFloat(amount), cur),
-        created: Date.now(),
-      };
-      // Keep the code before anything is signed, so it can never be lost after paying.
-      saveOrder(order, encodeSecret(secret));
-      const contract = makeContract(order, provider(wallet.net));
-      setBusy('Approve the lock in your wallet');
-      const txid = await lockFunds({ manager, net: wallet.net, contractAddress: contract.address, sats: BigInt(sats), itemLabel: order.item });
-      const code = saveOrder({ ...order, fundTxid: txid }, encodeSecret(secret));
+        sellerPkh: binToHex(hash160(pub)),
+        sats: f.sats!,
+        item: f.item,
+        price: f.price,
+        windowBlocks: f.windowBlocks,
+        onStep: setBusy,
+      });
       location.hash = `#/o/${code}`;
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -101,7 +168,24 @@ export function Home() {
     }
   }
 
-  const recent = listOrders().filter((o) => o.net === wallet.net).slice(0, 4);
+  return (
+    <form className="order-form" onSubmit={submit} noValidate>
+      <p className="hint">You play buyer and seller with your own wallet, so a full run only costs network fees (under ₦5).</p>
+      {f.fields('What are you buying?', 'Refund me if it hasn’t arrived in')}
+      {error && <p className="form-error" role="alert">{error}</p>}
+      <button className="btn btn-primary btn-block" type="submit" disabled={!!busy}>
+        {busy ?? (connected ? `Lock ${f.sats ? formatBch(f.sats) : 'payment'}` : 'Connect wallet to lock')}
+      </button>
+      {connected && balance !== null && <span className="hint mono">Wallet balance {formatBch(balance)}</span>}
+    </form>
+  );
+}
+
+export function Home() {
+  const wallet = useWallet();
+  const [mode, setMode] = useState<'sell' | 'try'>('sell');
+  const recent = listOrders().filter((o) => o.net === wallet.net && o.secret).slice(0, 4);
+  const links = listRequests().filter((r) => r.net === wallet.net).slice(0, 4);
 
   return (
     <>
@@ -109,85 +193,52 @@ export function Home() {
         <div className="hero-copy">
           <h1>Pay on delivery, without the cash.</h1>
           <p className="lead">
-            Lock BCH for an order. The seller is paid the moment you show your code at the door. No delivery, the money comes back to you.
+            Sellers send a payment link. The buyer's BCH stays locked until the parcel reaches them, then the seller is paid in seconds.
           </p>
           <a className="hero-setup" href="#setup" onClick={(e) => { e.preventDefault(); document.getElementById('setup')?.scrollIntoView({ behavior: 'smooth' }); }}>New to BCH? Set up a wallet in 2 minutes</a>
         </div>
 
-        <form className="panel order-form" onSubmit={submit} noValidate>
-          <h2 className="panel-title">New waybill</h2>
-          <label className="field">
-            <span>What are you buying?</span>
-            <input value={item} onChange={(e) => setItem(e.target.value)} placeholder="Ankara two-piece, size M" maxLength={80} required />
-          </label>
-
-          <div className="field">
-            <label htmlFor="amount">Price</label>
-            <div className="amount-row">
-              <input id="amount" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ''))} placeholder={cur === 'NGN' ? '25000' : cur === 'USD' ? '15' : '0.001'} />
-              <div className="seg" role="radiogroup" aria-label="Currency">
-                {(['NGN', 'USD', 'BCH'] as Currency[]).map((c) => (
-                  <button type="button" key={c} role="radio" aria-checked={cur === c} className={cur === c ? 'on' : ''} disabled={c !== 'BCH' && !rates} onClick={() => setCur(c)}>
-                    {c === 'NGN' ? '₦' : c === 'USD' ? '$' : 'BCH'}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <span className={`hint mono ${tooSmall ? 'hint-bad' : ''}`}>
-              {sats ? `Locks ${formatBch(sats)}${tooSmall ? `, below the ${formatBch(MIN_SATS)} minimum` : ''}` : rates ? 'Converted at the live BCH price' : 'Live price unavailable, enter BCH'}
-            </span>
+        <div className="panel">
+          <div className="seg seg-wide form-tabs" role="tablist" aria-label="Start">
+            <button role="tab" aria-selected={mode === 'sell'} className={mode === 'sell' ? 'on' : ''} onClick={() => setMode('sell')}>Sell: create a link</button>
+            <button role="tab" aria-selected={mode === 'try'} className={mode === 'try' ? 'on' : ''} onClick={() => setMode('try')}>Try it in 2 minutes</button>
           </div>
-
-          <fieldset className="field">
-            <legend>Who gets paid</legend>
-            <div className="seg seg-wide" role="radiogroup" aria-label="Seller">
-              <button type="button" role="radio" aria-checked={sellerMode === 'self'} className={sellerMode === 'self' ? 'on' : ''} onClick={() => setSellerMode('self')}>
-                Try it: pay myself
-              </button>
-              <button type="button" role="radio" aria-checked={sellerMode === 'address'} className={sellerMode === 'address' ? 'on' : ''} onClick={() => setSellerMode('address')}>
-                A seller's address
-              </button>
-            </div>
-            {sellerMode === 'address' ? (
-              <input aria-label="Seller BCH address" value={sellerAddress} onChange={(e) => setSellerAddress(e.target.value)} placeholder={wallet.net === 'mainnet' ? 'bitcoincash:q…' : 'bchtest:q…'} spellCheck={false} autoCapitalize="off" />
-            ) : (
-              <span className="hint">The seller is a second address in your own wallet, so a test only costs network fees.</span>
-            )}
-          </fieldset>
-
-          <label className="field">
-            <span>Refund me if it hasn't arrived in</span>
-            <select value={windowBlocks} onChange={(e) => setWindowBlocks(Number(e.target.value))}>
-              {WINDOWS.map((w) => (
-                <option key={w.blocks} value={w.blocks}>{w.label}</option>
-              ))}
-            </select>
-          </label>
-
-          {error && <p className="form-error" role="alert">{error}</p>}
-
-          <button className="btn btn-primary btn-block" type="submit" disabled={!!busy}>
-            {busy ?? (connected ? `Lock ${sats ? formatBch(sats) : 'payment'}` : 'Connect wallet to lock')}
-          </button>
-          {connected && balance !== null && <span className="hint mono">Wallet balance {formatBch(balance)}</span>}
-        </form>
+          {mode === 'sell' ? <SellForm /> : <TryForm />}
+        </div>
       </section>
 
-      {recent.length > 0 && (
+      {(links.length > 0 || recent.length > 0) && (
         <section className="container recent">
-          <h2 className="section-title">Your waybills on this phone</h2>
-          <ul className="recent-list">
-            {recent.map((o) => {
-              let label = o.item;
-              try { label = decodeOrder(o.code).item; } catch { /* keep saved label */ }
-              return (
-                <li key={o.code}>
-                  <a href={`#/o/${o.code}`}>{label}</a>
-                  <span className="hint">{new Date(o.created).toLocaleString()}</span>
-                </li>
-              );
-            })}
-          </ul>
+          {links.length > 0 && (
+            <>
+              <h2 className="section-title">Your payment links</h2>
+              <ul className="recent-list">
+                {links.map((r) => (
+                  <li key={r.rid}>
+                    <a href={`#/s/${r.code}`}>{r.item}</a>
+                    <span className="hint">{new Date(r.created).toLocaleString()}</span>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+          {recent.length > 0 && (
+            <>
+              <h2 className="section-title">Your purchases on this phone</h2>
+              <ul className="recent-list">
+                {recent.map((o) => {
+                  let label = o.item;
+                  try { label = decodeOrder(o.code).item; } catch { /* keep saved label */ }
+                  return (
+                    <li key={o.code}>
+                      <a href={`#/o/${o.code}`}>{label}</a>
+                      <span className="hint">{new Date(o.created).toLocaleString()}</span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </>
+          )}
         </section>
       )}
 
@@ -197,29 +248,29 @@ export function Home() {
           <li>
             <span className="step-n mono">1</span>
             <div>
-              <h3>You lock the money</h3>
-              <p>Your wallet sends BCH into a contract made for this one order. Nobody, including us, can spend it freely.</p>
+              <h3>Seller sends a link</h3>
+              <p>Item, price and where to get paid. The buyer opens it on WhatsApp.</p>
             </div>
           </li>
           <li>
             <span className="step-n mono">2</span>
             <div>
-              <h3>The seller sees it's real</h3>
-              <p>Send them the seller link. They see the money locked to their address before they dispatch.</p>
+              <h3>Buyer locks the money</h3>
+              <p>It goes into a contract made for this one order. The seller's page turns to Locked by itself.</p>
             </div>
           </li>
           <li>
             <span className="step-n mono">3</span>
             <div>
-              <h3>Code at the door</h3>
-              <p>Check the parcel, then let the rider scan your code. The contract pays the seller in seconds.</p>
+              <h3>Rider brings the code</h3>
+              <p>The seller sends the waybill to the rider. At the door the buyer scans it, checks the parcel and confirms.</p>
             </div>
           </li>
           <li>
             <span className="step-n mono">4</span>
             <div>
               <h3>No parcel, no payment</h3>
-              <p>If the deadline passes without a handover, anyone can trigger the refund, and it can only go back to you.</p>
+              <p>Only the buyer can release the money. If the deadline passes, the refund can only go back to them.</p>
             </div>
           </li>
         </ol>

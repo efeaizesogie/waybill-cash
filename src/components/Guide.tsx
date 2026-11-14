@@ -60,78 +60,66 @@ function Step({ n, title, children, visual }: { n: number; title: string; childr
 
 /** Setup guide for first-time buyers and sellers: which wallet, how to fund it, how to connect, what to do at the door. */
 export function Guide() {
-  const [who, setWho] = useState<'buyer' | 'seller'>('buyer');
+  const [who, setWho] = useState<'buyer' | 'seller'>('seller');
   const { openScanner, net } = useWallet();
   return (
     <section className="container guide" id="setup">
       <div className="guide-head">
         <h2 className="section-title">Get set up</h2>
         <div className="seg" role="tablist" aria-label="Guide for">
-          <button role="tab" aria-selected={who === 'buyer'} className={who === 'buyer' ? 'on' : ''} onClick={() => setWho('buyer')}>I'm buying</button>
           <button role="tab" aria-selected={who === 'seller'} className={who === 'seller' ? 'on' : ''} onClick={() => setWho('seller')}>I'm selling</button>
+          <button role="tab" aria-selected={who === 'buyer'} className={who === 'buyer' ? 'on' : ''} onClick={() => setWho('buyer')}>I'm buying</button>
         </div>
       </div>
 
-      {who === 'buyer' ? (
-        <ol className="gsteps">
-          <Step n={1} title="Get a Bitcoin Cash wallet" visual={<WalletCards />}>
-            <p>Install one of these. Write down the recovery words it shows you and keep them offline. They are the only way back into your money.</p>
-          </Step>
-          <Step n={2} title="Add some BCH">
-            <p>
-              In the wallet tap Receive and copy your address. Ask a friend to send you BCH, or buy some (Paytaca has a peer-to-peer exchange). You need the price of the order plus a tiny network fee, under ₦5.
-            </p>
-            {net === 'chipnet' && <p className="hint">Testing? Turn on Chipnet in the wallet settings and get free test coins from tbch.googol.cash.</p>}
-          </Step>
-          <Step
-            n={3}
-            title="Connect and lock the payment"
-            visual={<img className="shot" src="./guide/form.webp" alt="The New waybill form: item, price, who gets paid, refund deadline, and the lock button" width="320" height="445" loading="lazy" />}
-          >
-            <p>
-              Fill in the order above and tap Connect wallet. On a laptop, scan the code with your wallet. On your phone, tap Open in Cashonize, or copy the link and paste it in Paytaca under Apps, WizardConnect, Paste URL.
-            </p>
-            <p>Approve the lock in your wallet, then send the seller link on WhatsApp.</p>
-          </Step>
-          <Step
-            n={4}
-            title="Show your code at the door"
-            visual={
-              <div className="mini-stub" aria-label="Example handover code">
-                <Qr value="https://efeaizesogie.github.io/waybill-cash/#/example" size={150} label="Example handover code" />
-                <span>Example</span>
-              </div>
-            }
-          >
-            <p>Check the parcel first. Then open your waybill, tap Show handover code, and let the rider scan it. The seller is paid in seconds.</p>
-            <p>Parcel never came? After the deadline, open the waybill and tap Refund. Only you can receive it.</p>
-          </Step>
-        </ol>
-      ) : (
+      {who === 'seller' ? (
         <ol className="gsteps">
           <Step n={1} title="Get a Bitcoin Cash wallet" visual={<WalletCards />}>
             <p>Install one of these and write down its recovery words. You don't need any BCH to start selling.</p>
           </Step>
           <Step
             n={2}
-            title="Send the buyer your address"
-            visual={<div className="mini-addr mono">bitcoincash:qz…your address</div>}
+            title="Create a payment link"
+            visual={<img className="shot" src="./guide/sell.webp" alt="The Sell form: what you are selling, the price, the refund deadline and your BCH address" width="320" height="424" loading="lazy" />}
           >
-            <p>In your wallet tap Receive and copy the address. It starts with bitcoincash:q. Send it to the buyer, who pastes it under "A seller's address".</p>
+            <p>Use the Sell form at the top. Paste your address from your wallet's Receive screen (it starts with bitcoincash:q), then tap Create payment link and send it to the buyer on WhatsApp.</p>
           </Step>
           <Step
             n={3}
-            title="Dispatch only when it says locked"
+            title="Dispatch when it says Locked"
             visual={<img className="shot" src="./guide/ticket.webp" alt="A waybill ticket showing the item, the price, the seller and the refund deadline" width="360" height="268" loading="lazy" />}
           >
-            <p>Open the seller link the buyer sends you. When the ticket says "Locked until delivery", the money is held for you and the buyer can't take it back before the deadline.</p>
+            <p>Keep your link's page open. It turns to Locked by itself when the buyer pays. The money is then held for you and the buyer can't pull it back before the deadline.</p>
           </Step>
           <Step
             n={4}
-            title="Scan the buyer's code at handover"
-            visual={<button className="btn btn-primary" onClick={openScanner}>Scan code</button>}
+            title="Send the waybill to your rider"
+            visual={
+              <div className="mini-stub" aria-label="Example waybill code">
+                <Qr value="https://efeaizesogie.github.io/waybill-cash/#/example" size={150} label="Example waybill code" />
+                <span>Example</span>
+              </div>
+            }
           >
-            <p>Tap Scan code (top right of this site) and point it at the QR on the buyer's phone, then confirm. The money lands in your wallet. No wallet connection needed.</p>
+            <p>Tap Send to rider. The rider's link holds no key, so it can't move the money. At the door the rider shows its code, the buyer scans it and confirms, and the screen turns to Paid. Hand over the parcel then.</p>
+          </Step>
+        </ol>
+      ) : (
+        <ol className="gsteps">
+          <Step n={1} title="Get a Bitcoin Cash wallet" visual={<WalletCards />}>
+            <p>Install one of these. Write down the recovery words it shows you and keep them offline. They are the only way back into your money.</p>
+          </Step>
+          <Step n={2} title="Add some BCH">
+            <p>In the wallet tap Receive and copy your address. Ask a friend to send you BCH, or buy some (Paytaca has a peer-to-peer exchange). You need the price plus a tiny network fee, under ₦5.</p>
+            {net === 'chipnet' && <p className="hint">Testing? Turn on Chipnet in the wallet settings and get free test coins from tbch.googol.cash.</p>}
+          </Step>
+          <Step n={3} title="Open the seller's link and lock">
+            <p>Check the item, the price and the seller's address, then tap Connect wallet. On a laptop, scan the code with your wallet. On your phone, tap Open in Cashonize, or copy the link and paste it in Paytaca under Apps, WizardConnect, Paste URL.</p>
+            <p>Your money is locked, not sent. Keep using this phone: your release code is saved on it.</p>
+          </Step>
+          <Step n={4} title="At the door: scan, check, confirm" visual={<button className="btn btn-primary" onClick={openScanner}>Scan code</button>}>
+            <p>Tap Scan code and scan the code on the rider's phone. It opens your order. Check the parcel, then tap I have the parcel, pay the seller. No rider code? Open your waybill and confirm there.</p>
+            <p>Parcel never came? After the deadline, open the waybill and tap Refund. Only you can receive it.</p>
           </Step>
         </ol>
       )}

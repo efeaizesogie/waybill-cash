@@ -36,6 +36,7 @@ export interface Order {
   price?: string; // display price in local currency, e.g. "₦25,000"
   created: number; // unix ms
   fundTxid?: string;
+  rid?: string; // set when the order came from a seller's payment link
 }
 
 export const MAX_FEE = 1500;
@@ -188,4 +189,149 @@ export function decodeHandover(code: string): { order: Order; secret: Uint8Array
   const item = binToUtf8(buf.slice(o)) || 'Order';
   const order: Order = { v: 1, net, buyerPkh, sellerPkh, releaseHash: hashSecret(secret), refundAfter, maxFee, sats, item, created: 0 };
   return { order, secret };
+}
+
+// ---------- seller payment request ----------
+// The seller creates the waybill: item, price and their own address. The buyer completes it
+// (their refund address and the secret's hash) when they lock. `rid` ties the lock back to this request.
+
+export interface PaymentRequest {
+  net: Net;
+  sellerPkh: string;
+  sats: number;
+  item: string;
+  price?: string;
+  windowBlocks: number;
+  rid: string; // hex, 8 random bytes
+}
+
+const REQ_ITEM_MAX = 60;
+const REQ_PRICE_MAX = 24;
+
+export function newRequestId() {
+  const r = new Uint8Array(8);
+  crypto.getRandomValues(r);
+  return binToHex(r);
+}
+
+export function encodeRequest(req: PaymentRequest): string {
+  const item = clipUtf8(req.item, REQ_ITEM_MAX);
+  const price = req.price ? clipUtf8(req.price, REQ_PRICE_MAX) : new Uint8Array();
+  const buf = new Uint8Array(1 + 1 + 20 + 8 + 2 + 8 + 1 + item.length + price.length);
+  const dv = new DataView(buf.buffer);
+  let o = 0;
+  buf[o++] = 3;
+  buf[o++] = req.net === 'mainnet' ? 0 : 1;
+  buf.set(hexToBin(req.sellerPkh), o); o += 20;
+  dv.setBigUint64(o, BigInt(req.sats)); o += 8;
+  dv.setUint16(o, req.windowBlocks); o += 2;
+  buf.set(hexToBin(req.rid), o); o += 8;
+  buf[o++] = item.length;
+  buf.set(item, o); o += item.length;
+  buf.set(price, o);
+  return b64url(buf);
+}
+
+export function decodeRequest(code: string): PaymentRequest {
+  const buf = fromB64url(code);
+  if (buf.length < 41 || buf[0] !== 3) throw new Error('This payment link is broken. Ask the seller to send it again.');
+  const dv = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+  let o = 1;
+  const net: Net = buf[o++] === 0 ? 'mainnet' : 'chipnet';
+  const sellerPkh = binToHex(buf.slice(o, o + 20)); o += 20;
+  const sats = Number(dv.getBigUint64(o)); o += 8;
+  const windowBlocks = dv.getUint16(o); o += 2;
+  const rid = binToHex(buf.slice(o, o + 8)); o += 8;
+  const itemLen = buf[o++];
+  const item = binToUtf8(buf.slice(o, o + itemLen)) || 'Order'; o += itemLen;
+  const price = binToUtf8(buf.slice(o)) || undefined;
+  return { net, sellerPkh, sats, item, price, windowBlocks, rid };
+}
+
+// ---------- payment note (OP_RETURN in the lock tx) ----------
+// Lets the seller's page find the lock without a server: the lock tx also pays the seller a dust
+// "doorbell" output, and its OP_RETURN carries what the seller needs to rebuild the contract.
+
+export const NOTE_PREFIX = '5759424c'; // "WYBL"
+export const DOORBELL_SATS = 546;
+
+export interface PaymentNote { rid: string; buyerPkh: string; releaseHash: string; refundAfter: number }
+
+export function noteChunks(note: PaymentNote): string[] {
+  const h = new Uint8Array(4);
+  new DataView(h.buffer).setUint32(0, note.refundAfter);
+  return [`0x${NOTE_PREFIX}`, `0x${note.rid}`, `0x${note.buyerPkh}`, `0x${note.releaseHash}`, `0x${binToHex(h)}`];
+}
+
+/** Parse an OP_RETURN locking bytecode written by noteChunks. Returns null for anything else. */
+export function parseNote(lockingBytecode: Uint8Array): PaymentNote | null {
+  if (lockingBytecode[0] !== 0x6a) return null;
+  const pushes: Uint8Array[] = [];
+  let i = 1;
+  while (i < lockingBytecode.length) {
+    const op = lockingBytecode[i++];
+    let len: number;
+    if (op >= 1 && op <= 75) len = op;
+    else if (op === 0x4c) len = lockingBytecode[i++];
+    else return null;
+    pushes.push(lockingBytecode.slice(i, i + len));
+    i += len;
+  }
+  if (pushes.length !== 5 || binToHex(pushes[0]) !== NOTE_PREFIX) return null;
+  if (pushes[1].length !== 8 || pushes[2].length !== 20 || pushes[3].length !== 32 || pushes[4].length !== 4) return null;
+  return {
+    rid: binToHex(pushes[1]),
+    buyerPkh: binToHex(pushes[2]),
+    releaseHash: binToHex(pushes[3]),
+    refundAfter: new DataView(pushes[4].buffer, pushes[4].byteOffset, 4).getUint32(0),
+  };
+}
+
+export function orderFromRequest(req: PaymentRequest, note: PaymentNote): Order {
+  return {
+    v: 1, net: req.net, buyerPkh: note.buyerPkh, sellerPkh: req.sellerPkh, releaseHash: note.releaseHash,
+    refundAfter: note.refundAfter, maxFee: MAX_FEE, sats: req.sats, item: req.item, price: req.price, created: 0,
+  };
+}
+
+// ---------- waybill link (no secret) ----------
+// What the seller sends the rider, and what the rider's screen shows as a QR. It identifies the
+// order and contract but holds no key: scanning it lets you watch, or confirm if you are the buyer.
+
+export function encodeWaybill(order: Order): string {
+  const item = clipUtf8(order.item, ITEM_MAX);
+  const price = order.price ? clipUtf8(order.price, 16) : new Uint8Array();
+  const buf = new Uint8Array(1 + 1 + 20 + 20 + 4 + 2 + 8 + 32 + 1 + item.length + price.length);
+  const dv = new DataView(buf.buffer);
+  let o = 0;
+  buf[o++] = 4;
+  buf[o++] = order.net === 'mainnet' ? 0 : 1;
+  buf.set(hexToBin(order.buyerPkh), o); o += 20;
+  buf.set(hexToBin(order.sellerPkh), o); o += 20;
+  dv.setUint32(o, order.refundAfter); o += 4;
+  dv.setUint16(o, order.maxFee); o += 2;
+  dv.setBigUint64(o, BigInt(order.sats)); o += 8;
+  buf.set(hexToBin(order.releaseHash), o); o += 32;
+  buf[o++] = item.length;
+  buf.set(item, o); o += item.length;
+  buf.set(price, o);
+  return b64url(buf);
+}
+
+export function decodeWaybill(code: string): Order {
+  const buf = fromB64url(code);
+  if (buf.length < 89 || buf[0] !== 4) throw new Error('This waybill code is broken.');
+  const dv = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+  let o = 1;
+  const net: Net = buf[o++] === 0 ? 'mainnet' : 'chipnet';
+  const buyerPkh = binToHex(buf.slice(o, o + 20)); o += 20;
+  const sellerPkh = binToHex(buf.slice(o, o + 20)); o += 20;
+  const refundAfter = dv.getUint32(o); o += 4;
+  const maxFee = dv.getUint16(o); o += 2;
+  const sats = Number(dv.getBigUint64(o)); o += 8;
+  const releaseHash = binToHex(buf.slice(o, o + 32)); o += 32;
+  const itemLen = buf[o++] ?? 0;
+  const item = binToUtf8(buf.slice(o, o + itemLen)) || 'Order'; o += itemLen;
+  const price = binToUtf8(buf.slice(o)) || undefined;
+  return { v: 1, net, buyerPkh, sellerPkh, releaseHash, refundAfter, maxFee, sats, item, price, created: 0 };
 }

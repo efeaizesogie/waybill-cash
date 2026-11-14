@@ -51,11 +51,10 @@ export function Ticket({ order, status, height, children }: {
           </div>
           <div>
             <dt>Refund opens</dt>
-            <dd className="mono">
-              block {order.refundAfter.toLocaleString()}
-              {blocksLeft !== undefined && status === 'locked' && (
-                <span className="ticket-left"> {blocksLeft > 0 ? `in about ${blocksToTime(blocksLeft)}` : 'now'}</span>
-              )}
+            <dd className="mono" title={`Block ${order.refundAfter.toLocaleString()}`}>
+              {blocksLeft !== undefined && status === 'locked'
+                ? <span className="ticket-left">{blocksLeft > 0 ? `in about ${blocksToTime(blocksLeft)}` : 'now'}</span>
+                : `block ${order.refundAfter.toLocaleString()}`}
             </dd>
           </div>
         </dl>

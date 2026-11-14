@@ -158,3 +158,50 @@ describe('compact handover link', () => {
     expect(decodeHandover(encodeHandover(big, secret)).order.sats).toBe(big.sats);
   });
 });
+
+describe('seller request, payment note and waybill link', () => {
+  it('round-trips a payment request', async () => {
+    const w = await import('../src/lib/waybill');
+    const req = { net: 'chipnet' as const, sellerPkh: pkh(2), sats: 123_456, item: 'Ankara two-piece, size M', price: '₦25,000', windowBlocks: 432, rid: w.newRequestId() };
+    const back = w.decodeRequest(w.encodeRequest(req));
+    expect(back).toEqual(req);
+    expect(w.encodeRequest(req).length).toBeLessThan(160);
+  });
+
+  it('a lock tx carrying the note pays the contract, rings the seller and is readable', async () => {
+    const w = await import('../src/lib/waybill');
+    const { TransactionBuilder, SignatureTemplate } = await import('cashscript');
+    const { decodeTransaction, hexToBin: h2b } = await import('@bitauth/libauth');
+    const sig = new SignatureTemplate(new Uint8Array(32).fill(1));
+    const buyerAddr = w.addressFromPkh(pkh(1), 'chipnet');
+    provider.addUtxo(buyerAddr, randomUtxo({ satoshis: 500_000n }));
+    const [u] = await provider.getUtxos(buyerAddr);
+    const req = { net: 'chipnet' as const, sellerPkh: pkh(2), sats: 100_000, item: 'Shoes', windowBlocks: 144, rid: w.newRequestId() };
+    const note = { rid: req.rid, buyerPkh: pkh(1), releaseHash: order.releaseHash, refundAfter: HEIGHT + 144 };
+    const contract = w.makeContract(w.orderFromRequest(req, note), provider);
+    const hex = new TransactionBuilder({ provider })
+      .addInput(u, sig.unlockP2PKH())
+      .addOutput({ to: contract.address, amount: 100_000n })
+      .addOutput({ to: w.addressFromPkh(req.sellerPkh, 'chipnet'), amount: BigInt(w.DOORBELL_SATS) })
+      .addOpReturnOutput(w.noteChunks(note))
+      .addOutput({ to: buyerAddr, amount: 398_000n })
+      .build();
+    const tx = decodeTransaction(h2b(hex));
+    if (typeof tx === 'string') throw new Error(tx);
+    const parsed = tx.outputs.map((o) => w.parseNote(o.lockingBytecode)).find(Boolean);
+    expect(parsed).toEqual(note);
+    // The seller rebuilds the exact same contract from their request plus the note.
+    expect(w.makeContract(w.orderFromRequest(req, parsed!), provider).address).toBe(contract.address);
+  });
+
+  it('round-trips a waybill link that carries no secret', async () => {
+    const w = await import('../src/lib/waybill');
+    const code = w.encodeWaybill(order);
+    expect(code.length).toBeLessThan(170);
+    const back = w.decodeWaybill(code);
+    expect(back.price).toBe(order.price);
+    expect(back.item).toBe(order.item);
+    expect(makeContract(back, provider).address).toBe(makeContract(order, provider).address);
+    expect(code.includes(w.encodeSecret(secret))).toBe(false);
+  });
+});

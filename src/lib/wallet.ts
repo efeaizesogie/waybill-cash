@@ -2,7 +2,7 @@ import { TransactionBuilder, placeholderP2PKHUnlocker, type Utxo } from 'cashscr
 import type { DappConnectionManager } from '@wizardconnect/dapp';
 import { binToHex, hash160, encodeTransaction } from '@bitauth/libauth';
 import { sourceOutputToRelay } from '@wizardconnect/core/hdwalletv1-serialize';
-import { type Net, addressFromPubkey, DUST } from './waybill';
+import { type Net, addressFromPubkey, DUST, DOORBELL_SATS } from './waybill';
 import { provider } from './chain';
 
 const RECEIVE = 0;
@@ -52,8 +52,12 @@ export async function lockFunds(opts: {
   contractAddress: string;
   sats: bigint;
   itemLabel: string;
+  /** Seller-created orders: ring the seller's address and leave a note so their page can find the lock. */
+  note?: { sellerAddress: string; chunks: string[] };
 }) {
-  const { manager, net, contractAddress, sats } = opts;
+  const { manager, net, contractAddress, note } = opts;
+  const sats = opts.sats;
+  const extra = note ? BigInt(DOORBELL_SATS) : 0n;
   const p = provider(net);
   const { utxos } = await scanWallet(manager, net);
 
@@ -61,24 +65,28 @@ export async function lockFunds(opts: {
   const sorted = [...utxos].sort((a, b) => (b.satoshis > a.satoshis ? 1 : -1));
   const picked: WalletUtxo[] = [];
   let total = 0n;
-  const feeFor = (inputs: number) => BigInt(10 + inputs * 148 + 2 * 44 + 20);
+  const feeFor = (inputs: number) => BigInt(10 + inputs * 148 + 2 * 44 + 20 + (note ? 34 + 90 : 0));
   for (const u of sorted) {
     picked.push(u);
     total += u.satoshis;
-    if (total >= sats + feeFor(picked.length)) break;
+    if (total >= sats + extra + feeFor(picked.length)) break;
   }
   const fee = feeFor(picked.length);
-  if (total < sats + fee) {
-    throw new Error(`Not enough BCH in this wallet. Need ${sats + fee} sats, found ${total}.`);
+  if (total < sats + extra + fee) {
+    throw new Error(`Not enough BCH in this wallet. Need ${sats + extra + fee} sats, found ${total}.`);
   }
 
   const changePub = manager.getPubkey(manager.hasPath(CHANGE) ? CHANGE : RECEIVE, 0n)!;
   const changeAddress = addressFromPubkey(changePub, net);
-  const change = total - sats - fee;
+  const change = total - sats - extra - fee;
 
   const builder = new TransactionBuilder({ provider: p });
   for (const u of picked) builder.addInput(u, placeholderP2PKHUnlocker(u.address));
   builder.addOutput({ to: contractAddress, amount: sats });
+  if (note) {
+    builder.addOutput({ to: note.sellerAddress, amount: extra });
+    builder.addOpReturnOutput(note.chunks);
+  }
   if (change >= BigInt(DUST)) builder.addOutput({ to: changeAddress, amount: change });
 
   const wcObject = builder.generateWcTransactionObject({

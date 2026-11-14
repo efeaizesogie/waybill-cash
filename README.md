@@ -12,12 +12,16 @@ Waybill replaces the company with a Bitcoin Cash covenant. There is no arbiter, 
 
 ## How it settles
 
-| Step | Who | What happens on chain |
+| Step | Who | What happens |
 | --- | --- | --- |
-| Lock | Buyer, via WizardConnect (Paytaca, Cashonize) | Wallet sends BCH to a P2SH32 contract made for this order |
-| Check | Seller | Seller link shows the money locked to their address |
-| Handover | Rider or seller scans the buyer's QR | Anyone with the 16-byte secret can trigger `release`; the covenant only pays the seller |
+| Payment link | Seller | Item, price, their BCH address and a refund deadline become a link they send on WhatsApp. No wallet connection needed. |
+| Lock | Buyer, via WizardConnect (Paytaca, Cashonize) | The buyer's phone creates a 16-byte release code and keeps it. The wallet sends BCH to a P2SH32 contract made for this order, plus a 546-sat "doorbell" output to the seller and an OP_RETURN note |
+| Locked | Seller | The seller's page watches their own address, finds the doorbell, reads the note and rebuilds the contract. It turns to Locked by itself, with no server |
+| Send to rider | Seller | A waybill link with no key in it. The rider can watch and show its QR, but can't move the money |
+| Handover | Buyer | The buyer scans the rider's waybill QR, the order opens on their phone with the saved code, they check the parcel and confirm. `release` pays the seller. (Or the rider scans the buyer's code.) |
 | No delivery | Anyone, after the deadline | `refund` is unlocked by block height; the covenant only pays the buyer |
+
+Only the buyer ever holds the release code. If the seller or rider held it, they could pay themselves before delivering.
 
 Release and refund need **no signatures**: the covenant enforces where the money goes, so the rider never connects a wallet.
 
@@ -34,7 +38,7 @@ The tests in [`test/waybill.test.ts`](test/waybill.test.ts) cover paying the sel
 
 ## No backend
 
-Everything needed to rebuild the contract (buyer and seller key hashes, secret hash, deadline, amount, item) lives in the order link. The buyer's secret stays on their phone. The site is static on GitHub Pages and reads the chain through public Fulcrum servers.
+Everything needed to rebuild the contract lives in the links (payment link, waybill link) and in the lock transaction's OP_RETURN note. The buyer's secret stays on their phone. The site is static on GitHub Pages and reads the chain through public Fulcrum servers.
 
 ## Run it
 

@@ -165,6 +165,15 @@ input::placeholder { color: var(--color-muted); }
 .connect-sub { font-family: var(--font-body); font-size: var(--text-md); font-weight: 700; }
 .connect-same img { border-radius: 5px; }
 
+/* ---------- seller links ---------- */
+.form-tabs { margin-bottom: var(--space-md); }
+.hint-btn { justify-self: start; font-size: var(--text-sm); color: var(--color-ink-2); margin-top: var(--space-2xs); }
+.addr-full { overflow-wrap: anywhere; color: var(--color-on-forest); }
+.pay-qr { width: 100%; }
+.pay-qr summary { cursor: pointer; font-weight: 600; font-size: var(--text-sm); }
+.pay-qr[open] summary { margin-bottom: var(--space-md); }
+.pay-qr .qr { margin-inline: auto; }
+
 /* ---------- footer ---------- */
 .footer { padding-block: var(--space-xl) var(--space-2xl); border-top: var(--rule-hair) solid var(--color-rule); color: var(--color-muted); font-size: var(--text-sm); display: grid; gap: var(--space-sm); }
 .footer-links { display: flex; flex-wrap: wrap; gap: var(--space-lg); }
@@ -181,7 +190,16 @@ input::placeholder { color: var(--color-muted); }
   .connect-same { order: -1; }
   .steps { grid-template-columns: minmax(0, 1fr); }
   .panel, .ticket-main, .ticket-stub { padding: var(--space-md); }
-  .topbar .btn { padding: 0 var(--space-sm); font-size: var(--text-sm); }
+  .topbar .btn { min-height: 36px; padding: 0 var(--space-sm); font-size: var(--text-sm); }
   .topbar { gap: var(--space-xs); }
   .topbar-right { gap: var(--space-xs); }
+  /* Phones: smaller controls that keep a 40px touch target */
+  .btn { min-height: 40px; padding: 0 var(--space-md); font-size: var(--text-sm); }
+  .btn-block { min-height: 44px; font-size: var(--text-md); }
+  .stub-actions .btn { flex: 1 1 auto; }
+  .seg button { min-height: 34px; min-width: 40px; padding: 0 var(--space-sm); font-size: var(--text-sm); }
+  input, select { min-height: 44px; font-size: var(--text-md); }
+  .wordmark { font-size: var(--text-lg); }
+  .wordmark svg { width: 22px; height: 22px; }
+  .stub-lead { font-size: var(--text-md); }
 }

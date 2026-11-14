@@ -1,6 +1,6 @@
 import { ElectrumNetworkProvider, type SpendableUtxo } from 'cashscript';
 import { decodeTransaction, hexToBin, binToHex } from '@bitauth/libauth';
-import { type Net, type Order, makeContract, addressFromPkh, buildRelease, buildRefund } from './waybill';
+import { type Net, type Order, type PaymentRequest, makeContract, addressFromPkh, buildRelease, buildRefund, parseNote, orderFromRequest } from './waybill';
 import { cashAddressToLockingBytecode } from '@bitauth/libauth';
 
 const providers = new Map<Net, ElectrumNetworkProvider>();
@@ -72,3 +72,26 @@ export const blocksToTime = (blocks: number) => {
   if (h < 48) return `${h} hr`;
   return `${Math.round(h / 24)} days`;
 };
+
+/**
+ * Seller side of a payment request: look through the seller address's recent transactions for the
+ * buyer's lock (it rings the seller with a dust output and carries a note tagged with this request id).
+ */
+export async function findLockForRequest(req: PaymentRequest): Promise<{ order: Order; fundTxid: string } | null> {
+  const p = provider(req.net);
+  const address = addressFromPkh(req.sellerPkh, req.net);
+  const history = (await p.performRequest('blockchain.address.get_history', address)) as unknown as HistoryItem[];
+  if (!history?.length) return null;
+  // Unconfirmed come last; check the newest 30.
+  const recent = [...history].reverse().slice(0, 30);
+  for (const item of recent) {
+    const raw = await p.getRawTransaction(item.tx_hash);
+    const tx = decodeTransaction(hexToBin(raw));
+    if (typeof tx === 'string') continue;
+    for (const out of tx.outputs) {
+      const note = parseNote(out.lockingBytecode);
+      if (note && note.rid === req.rid) return { order: { ...orderFromRequest(req, note), fundTxid: item.tx_hash }, fundTxid: item.tx_hash };
+    }
+  }
+  return null;
+}

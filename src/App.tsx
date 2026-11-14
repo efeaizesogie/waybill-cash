@@ -5,18 +5,26 @@ import { ConnectDialog } from './components/ConnectDialog';
 import { Scanner } from './components/Scanner';
 import { Banner } from './components/Banner';
 import { Home } from './pages/Home';
-import { OrderPage } from './pages/OrderPage';
+import { OrderPage, WaybillPage } from './pages/OrderPage';
+import { RequestPage } from './pages/RequestPage';
+import { SellerPage } from './pages/SellerPage';
 import { HandoverPage } from './pages/HandoverPage';
 import { WalletContext } from './lib/walletContext';
 
 type Route =
   | { name: 'home' }
   | { name: 'order'; code: string }
+  | { name: 'waybill'; code: string }
+  | { name: 'request'; code: string }
+  | { name: 'seller'; code: string }
   | { name: 'handover'; order: Order | null; secret: Uint8Array | null };
 
 function parseRoute(hash: string): Route {
   const parts = hash.replace(/^#\/?/, '').split('/');
   if (parts[0] === 'o' && parts[1]) return { name: 'order', code: parts[1] };
+  if (parts[0] === 'w' && parts[1]) return { name: 'waybill', code: parts[1] };
+  if (parts[0] === 'r' && parts[1]) return { name: 'request', code: parts[1] };
+  if (parts[0] === 's' && parts[1]) return { name: 'seller', code: parts[1] };
   // Short handover link (what the QR carries now)
   if (parts[0] === 'x' && parts[1]) {
     try {
@@ -113,6 +121,9 @@ export default function App() {
       <main>
         {route.name === 'home' && <Home />}
         {route.name === 'order' && <OrderPage code={route.code} />}
+        {route.name === 'waybill' && <WaybillPage code={route.code} />}
+        {route.name === 'request' && <RequestPage code={route.code} />}
+        {route.name === 'seller' && <SellerPage code={route.code} />}
         {route.name === 'handover' && <HandoverPage order={route.order} secret={route.secret} />}
       </main>
 

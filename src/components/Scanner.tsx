@@ -25,14 +25,14 @@ export function Scanner({ onClose }: { onClose: () => void }) {
         const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
         const hit = jsQR(img.data, img.width, img.height, { inversionAttempts: 'dontInvert' });
         if (hit?.data) {
-          const m = hit.data.match(/#\/(x\/[A-Za-z0-9_-]+|h\/[A-Za-z0-9_-]+\/[A-Za-z0-9_-]+)/);
+          const m = hit.data.match(/#\/([xwr]\/[A-Za-z0-9_-]+|h\/[A-Za-z0-9_-]+\/[A-Za-z0-9_-]+)/);
           if (m) {
             stopped = true;
             location.hash = `#/${m[1]}`;
             onClose();
             return;
           }
-          setMiss("That's not a Waybill handover code. Ask the buyer to tap Show handover code.");
+          setMiss("That's not a Waybill code. Ask for the code on the Waybill screen.");
         }
       }
       raf = requestAnimationFrame(tick);
@@ -59,10 +59,10 @@ export function Scanner({ onClose }: { onClose: () => void }) {
   }, [onClose]);
 
   return (
-    <div className="scanner" role="dialog" aria-modal="true" aria-label="Scan the buyer's handover code">
+    <div className="scanner" role="dialog" aria-modal="true" aria-label="Scan a Waybill code">
       <div className="scanner-panel">
         <div className="scanner-head">
-          <h2 className="panel-title">Scan the buyer's code</h2>
+          <h2 className="panel-title">Scan a Waybill code</h2>
           <button className="btn btn-quiet" onClick={onClose}>Close</button>
         </div>
         {error ? (
@@ -73,7 +73,7 @@ export function Scanner({ onClose }: { onClose: () => void }) {
             <span className="scanner-frame" aria-hidden="true" />
           </div>
         )}
-        <p className="hint">{miss ?? 'Point the camera at the QR code on the buyer’s phone. Payment only goes to the seller.'}</p>
+        <p className="hint">{miss ?? 'Point the camera at the QR on the other phone. Buyers: scan the rider’s code. Riders: scan the buyer’s code.'}</p>
       </div>
     </div>
   );
