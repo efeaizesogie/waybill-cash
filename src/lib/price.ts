@@ -4,12 +4,26 @@ export interface Rates { usd: number; ngn: number }
 
 let cached: Promise<Rates | null> | null = null;
 
+const fromCoinGecko = () =>
+  fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin-cash&vs_currencies=usd,ngn')
+    .then((r) => (r.ok ? r.json() : null))
+    .then((j) => (j?.['bitcoin-cash']?.usd ? { usd: j['bitcoin-cash'].usd, ngn: j['bitcoin-cash'].ngn } : null));
+
+const fromCoinbase = () =>
+  fetch('https://api.coinbase.com/v2/exchange-rates?currency=BCH')
+    .then((r) => (r.ok ? r.json() : null))
+    .then((j) => (j?.data?.rates?.USD ? { usd: Number(j.data.rates.USD), ngn: Number(j.data.rates.NGN) } : null));
+
+/** Live BCH price, CoinGecko first, Coinbase if that is rate-limited. */
 export function getRates(): Promise<Rates | null> {
   if (!cached) {
-    cached = fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin-cash&vs_currencies=usd,ngn')
-      .then((r) => (r.ok ? r.json() : null))
-      .then((j) => (j?.['bitcoin-cash']?.usd ? { usd: j['bitcoin-cash'].usd, ngn: j['bitcoin-cash'].ngn } : null))
-      .catch(() => null);
+    cached = fromCoinGecko()
+      .catch(() => null)
+      .then((r) => r ?? fromCoinbase().catch(() => null))
+      .then((r) => {
+        if (!r) cached = null; // try again next time
+        return r;
+      });
   }
   return cached;
 }
