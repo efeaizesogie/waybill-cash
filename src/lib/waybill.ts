@@ -84,7 +84,7 @@ export function makeContract(order: Order, provider: NetworkProvider) {
       BigInt(order.refundAfter),
       BigInt(order.maxFee),
     ],
-    { provider, addressType: 'p2sh32' },
+    { provider, contractType: 'p2sh32' },
   );
 }
 
