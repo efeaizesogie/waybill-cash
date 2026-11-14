@@ -32,7 +32,7 @@ body { font-stretch: 100%; }
 /* ---------- buttons ---------- */
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: var(--space-xs); min-height: 44px; padding: 0 var(--space-lg); border-radius: var(--radius-pill); border: 1px solid transparent; font-weight: 600; font-size: var(--text-md); text-decoration: none; cursor: pointer; transition: background-color var(--dur-micro) var(--ease-out), border-color var(--dur-micro) var(--ease-out), transform var(--dur-micro) var(--ease-out); }
 .btn:active:not(:disabled) { transform: translateY(1px); }
-.btn:disabled { cursor: progress; opacity: 0.6; }
+.btn:disabled { cursor: progress; background: var(--color-paper-3); color: var(--color-muted); border-color: var(--color-rule); }
 .btn-primary { background: var(--color-accent); color: var(--color-accent-ink); }
 .btn-primary:hover:not(:disabled) { background: color-mix(in oklab, var(--color-accent) 88%, var(--color-ink)); }
 .btn-quiet { background: transparent; color: inherit; border-color: color-mix(in oklab, currentColor 28%, transparent); }
@@ -57,10 +57,10 @@ input:hover, select:hover { border-color: var(--color-muted); }
 input:focus-visible, select:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 0; border-color: var(--color-focus); }
 input::placeholder { color: var(--color-muted); }
 .amount-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-xs); }
-.seg { display: inline-flex; padding: 3px; gap: 2px; background: var(--color-paper-3); border-radius: var(--radius-pill); }
-.seg button { min-height: 42px; min-width: 48px; padding: 0 var(--space-md); border: 0; border-radius: var(--radius-pill); background: transparent; color: var(--color-ink-2); font-weight: 600; cursor: pointer; transition: background-color var(--dur-micro) var(--ease-out); }
+.seg { display: inline-flex; padding: var(--space-2xs); gap: var(--space-3xs); background: var(--color-paper-3); border-radius: var(--radius-pill); }
+.seg button { min-height: 40px; min-width: 48px; padding: 0 var(--space-md); border: 0; border-radius: var(--radius-pill); background: transparent; color: var(--color-ink-2); font-weight: 600; cursor: pointer; transition: background-color var(--dur-micro) var(--ease-out); }
 .seg button:hover:not(:disabled):not(.on) { background: color-mix(in oklab, var(--color-paper-2) 70%, transparent); }
-.seg button.on { background: var(--color-forest); color: var(--color-on-forest); }
+.seg button.on { background: var(--color-paper-2); color: var(--color-ink); box-shadow: inset 0 0 0 1px var(--color-ink); }
 .seg button:disabled { opacity: 0.45; cursor: not-allowed; }
 .seg-wide { display: grid; grid-template-columns: 1fr 1fr; margin-bottom: var(--space-xs); }
 .hint { font-size: var(--text-sm); color: var(--color-muted); }
@@ -96,7 +96,7 @@ input::placeholder { color: var(--color-muted); }
 .state-error { color: var(--color-paper); }
 .ticket-item { font-family: var(--font-body); font-size: var(--text-xl); font-weight: 700; line-height: 1.2; margin-top: var(--space-xs); }
 .ticket-amount { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-xs) var(--space-md); }
-.ticket-price { font-size: var(--text-3xl); font-weight: 800; font-stretch: 125%; letter-spacing: -0.02em; color: var(--color-accent); }
+.ticket-price { font-variant-numeric: tabular-nums; font-size: var(--text-3xl); font-weight: 800; font-stretch: 125%; letter-spacing: -0.02em; color: var(--color-accent); }
 .ticket-bch { color: var(--color-on-forest-muted); }
 .ticket-price + .ticket-bch { font-size: var(--text-sm); }
 .ticket-bch:only-child { font-size: var(--text-2xl); color: var(--color-accent); }
