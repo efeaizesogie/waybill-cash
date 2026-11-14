@@ -70,12 +70,12 @@ input::placeholder { color: var(--color-muted); }
 .form-error { color: var(--color-error); font-size: var(--text-sm); }
 
 /* ---------- sections ---------- */
-.section-title { font-size: var(--text-xl); font-weight: 700; font-stretch: 112%; margin-bottom: var(--space-lg); }
+.section-title { font-size: clamp(var(--text-2xl), 1.4rem + 1.2vw, var(--text-3xl)); font-weight: 800; font-stretch: 125%; letter-spacing: -0.02em; line-height: 1.1; margin-bottom: var(--space-xl); }
 .how { padding-block: var(--space-2xl); border-top: var(--rule-hair) solid var(--color-rule); }
 .steps { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--gap-columns); }
 .steps li { display: grid; gap: var(--space-sm); align-content: start; }
 .step-n { display: inline-grid; place-items: center; width: 36px; height: 36px; border-radius: var(--radius-pill); background: var(--color-forest); color: var(--color-accent); font-weight: 700; }
-.steps h3 { font-family: var(--font-body); font-size: var(--text-lg); font-weight: 700; }
+.steps h3 { font-family: var(--font-body); font-size: var(--text-xl); font-weight: 700; }
 .steps p { color: var(--color-ink-2); margin-top: var(--space-2xs); }
 .recent { padding-bottom: var(--space-xl); }
 .recent-list { list-style: none; margin: 0; padding: 0; border-top: var(--rule-hair) solid var(--color-rule); }
@@ -135,7 +135,7 @@ input::placeholder { color: var(--color-muted); }
 .gstep { display: grid; grid-template-columns: auto minmax(0, 1fr) minmax(0, 360px); gap: var(--space-md) var(--space-lg); align-items: start; padding-bottom: var(--space-xl); border-bottom: var(--rule-hair) solid var(--color-rule); }
 .gstep:last-child { border-bottom: 0; padding-bottom: 0; }
 .gstep-body { display: grid; gap: var(--space-xs); max-width: 60ch; }
-.gstep-body h3 { font-family: var(--font-body); font-size: var(--text-lg); font-weight: 700; }
+.gstep-body h3 { font-family: var(--font-body); font-size: var(--text-xl); font-weight: 700; }
 .gstep-body p { color: var(--color-ink-2); }
 .gstep-visual { justify-self: stretch; min-width: 0; max-width: 360px; }
 .gstep-visual .shot { max-width: 280px; }
