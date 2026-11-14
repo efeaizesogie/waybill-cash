@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useWallet } from '../lib/walletContext';
 import { type Currency, type Rates, getRates, toSats, formatMoney, formatBch } from '../lib/price';
 import { pkhFromAddress, netFromAddress, decodeOrder, newRequestId } from '../lib/waybill';
@@ -80,6 +80,30 @@ function SellForm() {
   const [error, setError] = useState<string | null>(null);
   const connected = wallet.state === 'connected' && !!wallet.manager;
 
+  // The connected wallet's receive address, filled in for the seller. Never overwrites an address they typed.
+  const walletAddress = useMemo(() => {
+    if (!connected || !wallet.manager) return null;
+    try {
+      return buyerIdentity(wallet.manager, wallet.net).address;
+    } catch {
+      return null;
+    }
+  }, [connected, wallet.manager, wallet.net]);
+  const lastAuto = useRef<string | null>(null);
+  useEffect(() => {
+    setAddress((current) => {
+      if (walletAddress && (current === '' || current === lastAuto.current)) {
+        lastAuto.current = walletAddress;
+        return walletAddress;
+      }
+      if (!walletAddress && current !== '' && current === lastAuto.current) {
+        lastAuto.current = null;
+        return '';
+      }
+      return current;
+    });
+  }, [walletAddress]);
+
   function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -110,10 +134,15 @@ function SellForm() {
       <label className="field">
         <span>Your BCH address (where you get paid)</span>
         <input value={address} onChange={(e) => setAddress(e.target.value)} placeholder={wallet.net === 'mainnet' ? 'bitcoincash:q…' : 'bchtest:q…'} spellCheck={false} autoCapitalize="off" />
-        {connected && wallet.manager ? (
-          <button type="button" className="link-btn hint-btn" onClick={() => setAddress(buyerIdentity(wallet.manager!, wallet.net).address)}>Use my connected wallet's address</button>
+        {walletAddress && address === walletAddress ? (
+          <span className="hint">Filled in from your connected wallet. You can change it.</span>
+        ) : walletAddress ? (
+          <button type="button" className="link-btn hint-btn" onClick={() => { lastAuto.current = walletAddress; setAddress(walletAddress); }}>Use my connected wallet's address</button>
         ) : (
-          <span className="hint">In your wallet, tap Receive and copy the address.</span>
+          <span className="hint">
+            Copy it from your wallet's Receive screen, or{' '}
+            <button type="button" className="link-btn" onClick={wallet.openConnect}>connect your wallet</button> to fill it in.
+          </span>
         )}
       </label>
       {error && <p className="form-error" role="alert">{error}</p>}
