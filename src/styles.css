@@ -21,6 +21,8 @@ body { font-stretch: 100%; }
 .banner-title { color: var(--color-accent); font-weight: 600; margin-right: auto; }
 .banner a { color: var(--color-on-forest); }
 .banner-copy { background: none; border: 0; padding: 0; color: var(--color-on-forest); text-decoration: underline; text-underline-offset: 0.16em; cursor: pointer; }
+.banner-vote { min-width: 0; overflow-wrap: anywhere; }
+.banner-addr { font-family: var(--font-outlier); font-size: var(--text-xs); user-select: all; }
 .banner a:hover, .banner-copy:hover { color: var(--color-accent); }
 
 /* ---------- top bar ---------- */

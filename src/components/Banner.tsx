@@ -19,9 +19,12 @@ export function Banner() {
         <span className="banner-title">BCH BLAZE 2026 entry</span>
         <a href={SLIDES_URL} target="_blank" rel="noreferrer">Slides</a>
         <a href={REPO_URL} target="_blank" rel="noreferrer">Repo</a>
-        <button type="button" className="banner-copy" onClick={copy} title={EMBER_ADDRESS}>
-          {copied ? 'Vote address copied' : 'Vote with EMBER2026'}
-        </button>
+        <span className="banner-vote">
+          EMBER2026 votes: <span className="banner-addr">{EMBER_ADDRESS}</span>{' '}
+          <button type="button" className="banner-copy" onClick={copy}>
+            {copied ? 'Copied' : 'Copy'}
+          </button>
+        </span>
       </div>
     </div>
   );
