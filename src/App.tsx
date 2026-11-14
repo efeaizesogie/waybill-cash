@@ -104,19 +104,28 @@ export default function App() {
           waybill
         </a>
         <div className="topbar-right">
-          {NET === 'chipnet' && <span className="net-tag">Chipnet test coins</span>}
-          <button className="btn btn-quiet topbar-scan" onClick={openScanner}>Scan code</button>
+          <button className="btn btn-quiet topbar-scan" onClick={openScanner} aria-label="Scan code">
+            Scan<span className="wide-only"> code</span>
+          </button>
           {wc.state === 'connected' ? (
-            <button className="btn btn-quiet" onClick={() => wc.disconnect()} title="Disconnect wallet">
-              {wc.walletName ?? 'Wallet'} connected
+            <button className="btn btn-quiet" onClick={() => wc.disconnect()} title="Disconnect wallet" aria-label={`${wc.walletName ?? 'Wallet'} connected. Tap to disconnect.`}>
+              <span className="wide-only">{wc.walletName ?? 'Wallet'} </span>Connected
             </button>
           ) : (
-            <button className="btn btn-quiet" onClick={connect}>
-              {wc.state === 'connecting' && wc.uri ? 'Waiting for wallet' : 'Connect wallet'}
+            <button className="btn btn-quiet" onClick={connect} aria-label={wc.state === 'connecting' && wc.uri ? 'Waiting for wallet' : 'Connect wallet'}>
+              {wc.state === 'connecting' && wc.uri ? 'Waiting…' : <>Connect<span className="wide-only"> wallet</span></>}
             </button>
           )}
         </div>
       </header>
+      {NET === 'chipnet' && (
+        <div className="net-strip">
+          <div className="container net-strip-row">
+            <span>You're using Chipnet test coins.</span>
+            <a href={location.pathname}>Switch to real BCH</a>
+          </div>
+        </div>
+      )}
 
       <main>
         {route.name === 'home' && <Home />}

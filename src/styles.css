@@ -29,7 +29,10 @@ body { font-stretch: 100%; }
 .topbar { display: flex; align-items: center; justify-content: space-between; padding-block: var(--space-md); gap: var(--space-md); }
 .wordmark { display: inline-flex; gap: var(--space-xs); align-items: center; font-weight: 800; font-stretch: 125%; font-size: var(--text-xl); text-decoration: none; color: var(--color-ink); letter-spacing: -0.02em; }
 .topbar-right { display: flex; gap: var(--space-sm); align-items: center; }
-.net-tag { font-size: var(--text-sm); color: var(--color-warn); }
+.net-strip-row { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--space-2xs) var(--space-md); }
+.net-strip { padding-block: var(--space-xs); font-size: var(--text-sm); color: var(--color-ink-2); background: color-mix(in oklab, var(--color-warn) 12%, var(--color-paper)); border-block: var(--rule-hair) solid color-mix(in oklab, var(--color-warn) 30%, var(--color-paper)); }
+.net-strip a { font-weight: 600; color: var(--color-ink); }
+.topbar .btn { white-space: nowrap; }
 
 /* ---------- buttons ---------- */
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: var(--space-xs); min-height: 44px; padding: 0 var(--space-lg); border-radius: var(--radius-pill); border: 1px solid transparent; font-weight: 600; font-size: var(--text-md); text-decoration: none; cursor: pointer; transition: background-color var(--dur-micro) var(--ease-out), border-color var(--dur-micro) var(--ease-out), transform var(--dur-micro) var(--ease-out); }
@@ -165,6 +168,10 @@ input::placeholder { color: var(--color-muted); }
 .connect-sub { font-family: var(--font-body); font-size: var(--text-md); font-weight: 700; }
 .connect-same img { border-radius: 5px; }
 
+@media (max-width: 26rem) {
+  .wide-only { display: none; }
+}
+
 /* ---------- seller links ---------- */
 .form-tabs { margin-bottom: var(--space-md); }
 .hint-btn { justify-self: start; font-size: var(--text-sm); color: var(--color-ink-2); margin-top: var(--space-2xs); }
@@ -190,7 +197,7 @@ input::placeholder { color: var(--color-muted); }
   .connect-same { order: -1; }
   .steps { grid-template-columns: minmax(0, 1fr); }
   .panel, .ticket-main, .ticket-stub { padding: var(--space-md); }
-  .topbar .btn { min-height: 36px; padding: 0 var(--space-sm); font-size: var(--text-sm); }
+  .topbar .btn { min-height: 36px; padding: 0 var(--space-md); font-size: var(--text-sm); }
   .topbar { gap: var(--space-xs); }
   .topbar-right { gap: var(--space-xs); }
   /* Phones: smaller controls that keep a 40px touch target */
