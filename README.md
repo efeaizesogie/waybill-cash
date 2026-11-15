@@ -6,7 +6,7 @@ Live: https://efeaizesogie.github.io/waybill-cash/ · Built for BCH BLAZE 2026.
 
 ![Waybill: seller sends a link, buyer locks the money, rider shows the code, buyer confirms and the seller is paid](docs/waybill-flow.png)
 
-**[Watch the 90-second demo](docs/waybill-demo.mp4)**: the whole flow with voiceover, recorded on the live app (Chipnet test network, simulated wallet).
+**[Watch the 90-second demo](docs/waybill-demo.mp4)**: the whole flow with voiceover, recorded on the live app (Chipnet test network, simulated wallet). **Install it on your phone** from the site: Install Waybill on your phone (Android) or Share, Add to Home Screen (iPhone).
 
 ![Waybill home page: create a payment link or try it in 2 minutes](docs/waybill-home.png)
 
