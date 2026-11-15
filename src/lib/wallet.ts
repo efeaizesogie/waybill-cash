@@ -4,6 +4,7 @@ import { binToHex, hash160, encodeTransaction } from '@bitauth/libauth';
 import { sourceOutputToRelay } from '@wizardconnect/core/hdwalletv1-serialize';
 import { type Net, addressFromPubkey, DUST, DOORBELL_SATS } from './waybill';
 import { provider } from './chain';
+import { formatBch } from './price';
 
 const RECEIVE = 0;
 const CHANGE = 1;
@@ -23,7 +24,7 @@ export function buyerIdentity(manager: DappConnectionManager, net: Net) {
 }
 
 /** Scan the first few receive + change addresses for spendable BCH (no tokens). */
-export async function scanWallet(manager: DappConnectionManager, net: Net, receiveCount = 20, changeCount = 10) {
+export async function scanWallet(manager: DappConnectionManager, net: Net, receiveCount = 40, changeCount = 20) {
   const p = provider(net);
   const slots: { child: number; index: number; address: string }[] = [];
   for (const [child, count] of [[RECEIVE, receiveCount], [CHANGE, changeCount]] as const) {
@@ -54,6 +55,9 @@ export async function lockFunds(opts: {
   itemLabel: string;
   /** Seller-created orders: ring the seller's address and leave a note so their page can find the lock. */
   note?: { sellerAddress: string; chunks: string[] };
+  /** How long to wait for the wallet to approve before giving up with instructions. */
+  timeoutMs?: number;
+  onStep?: (label: string) => void;
 }) {
   const { manager, net, contractAddress, note } = opts;
   const sats = opts.sats;
@@ -73,7 +77,11 @@ export async function lockFunds(opts: {
   }
   const fee = feeFor(picked.length);
   if (total < sats + extra + fee) {
-    throw new Error(`Not enough BCH in this wallet. Need ${sats + extra + fee} sats, found ${total}.`);
+    const netName = net === 'chipnet' ? 'Chipnet test coins' : 'real BCH';
+    throw new Error(
+      `Not enough ${netName} in the connected wallet: this needs ${formatBch(sats + extra + fee)}, it has ${formatBch(total)}. ` +
+        `Check the wallet is on ${net === 'chipnet' ? 'Chipnet' : 'mainnet'} and funded, then tap Lock again.`,
+    );
   }
 
   const changePub = manager.getPubkey(manager.hasPath(CHANGE) ? CHANGE : RECEIVE, 0n)!;
@@ -101,12 +109,29 @@ export async function lockFunds(opts: {
     broadcast: false,
     userPrompt: wcObject.userPrompt,
   };
-  const response = await manager.signTransaction({
-    transaction: relayRequest as never,
-    inputPaths: picked.map((u, i) => [i, PATH_NAME[u.child], u.index] as [number, string, number]),
-  });
-  if (response.error) throw new Error(response.error);
+  opts.onStep?.('Approve the lock in your wallet');
+  const abort = new AbortController();
+  const timer = setTimeout(() => abort.abort(), opts.timeoutMs ?? 90_000);
+  let response;
+  try {
+    response = await manager.signTransaction(
+      {
+        transaction: relayRequest as never,
+        inputPaths: picked.map((u, i) => [i, PATH_NAME[u.child], u.index] as [number, string, number]),
+      },
+      { signal: abort.signal },
+    );
+  } catch (e) {
+    if (abort.signal.aborted) {
+      throw new Error('Your wallet didn’t answer. In Paytaca, open Apps, then WizardConnect, to find the request (in Cashonize, open Connect). Then tap Lock again.');
+    }
+    throw e;
+  } finally {
+    clearTimeout(timer);
+  }
+  if (response.error) throw new Error(/reject/i.test(response.error) ? 'You declined the lock in your wallet. Nothing was sent.' : response.error);
 
+  opts.onStep?.('Sending');
   const txid = await p.sendRawTransaction(response.signedTransaction);
   return txid;
 }

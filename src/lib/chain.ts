@@ -1,10 +1,16 @@
-import { ElectrumNetworkProvider, type SpendableUtxo } from 'cashscript';
+import { ElectrumNetworkProvider, type NetworkProvider, type SpendableUtxo } from 'cashscript';
 import { decodeTransaction, hexToBin, binToHex } from '@bitauth/libauth';
 import { type Net, type Order, type PaymentRequest, makeContract, addressFromPkh, buildRelease, buildRefund, parseNote, orderFromRequest } from './waybill';
 import { cashAddressToLockingBytecode } from '@bitauth/libauth';
 
 const providers = new Map<Net, ElectrumNetworkProvider>();
-export function provider(net: Net) {
+let override: NetworkProvider | null = null;
+/** Tests only: route every chain call through another provider (e.g. CashScript's MockNetworkProvider). */
+export function useProviderForTests(p: NetworkProvider | null) {
+  override = p;
+}
+export function provider(net: Net): NetworkProvider {
+  if (override) return override;
   let p = providers.get(net);
   if (!p) {
     p = new ElectrumNetworkProvider(net);
@@ -36,7 +42,7 @@ export async function getStatus(order: Order): Promise<Status> {
   const [utxos, height] = await Promise.all([contract.getUtxos(), p.getBlockHeight()]);
   if (utxos.length) return { kind: 'locked', utxo: utxos[0], height };
 
-  const history = (await p.performRequest('blockchain.address.get_history', contract.address)) as unknown as HistoryItem[];
+  const history = (await (p as ElectrumNetworkProvider).performRequest('blockchain.address.get_history', contract.address)) as unknown as HistoryItem[];
   if (!history?.length) return { kind: 'waiting' };
 
   const sellerLock = lockOf(addressFromPkh(order.sellerPkh, order.net));
@@ -80,7 +86,7 @@ export const blocksToTime = (blocks: number) => {
 export async function findLockForRequest(req: PaymentRequest): Promise<{ order: Order; fundTxid: string } | null> {
   const p = provider(req.net);
   const address = addressFromPkh(req.sellerPkh, req.net);
-  const history = (await p.performRequest('blockchain.address.get_history', address)) as unknown as HistoryItem[];
+  const history = (await (p as ElectrumNetworkProvider).performRequest('blockchain.address.get_history', address)) as unknown as HistoryItem[];
   if (!history?.length) return null;
   // Unconfirmed come last; check the newest 30.
   const recent = [...history].reverse().slice(0, 30);

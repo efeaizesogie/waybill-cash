@@ -41,8 +41,9 @@ export async function lockOrder(opts: {
   // Keep the code before anything is signed, so it can never be lost after paying.
   saveOrder(order, encodeSecret(secret));
   const contract = makeContract(order, provider(net));
-  opts.onStep?.('Approve the lock in your wallet');
+  opts.onStep?.('Checking your wallet');
   const txid = await lockFunds({
+    onStep: opts.onStep,
     manager,
     net,
     contractAddress: contract.address,

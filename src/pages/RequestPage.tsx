@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { scanWallet } from '../lib/wallet';
 import { decodeRequest, addressFromPkh } from '../lib/waybill';
 import { useWallet } from '../lib/walletContext';
 import { lockOrder } from '../lib/lock';
@@ -12,6 +13,16 @@ export function RequestPage({ code }: { code: string }) {
   const req = useMemo(() => { try { return decodeRequest(code); } catch { return null; } }, [code]);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [balance, setBalance] = useState<bigint | null>(null);
+  const isConnected = wallet.state === 'connected' && !!wallet.manager;
+  useEffect(() => {
+    if (!isConnected || !wallet.manager || !req) return;
+    let alive = true;
+    scanWallet(wallet.manager, req.net).then((r) => alive && setBalance(r.balance)).catch(() => alive && setBalance(null));
+    return () => {
+      alive = false;
+    };
+  }, [isConnected, wallet.manager, req]);
 
   if (!req) {
     return (
@@ -97,6 +108,12 @@ export function RequestPage({ code }: { code: string }) {
                 <button className="btn btn-primary btn-block" onClick={pay} disabled={!!busy}>
                   {busy ?? (connected ? `Lock ${req.price ?? formatBch(req.sats)}` : 'Connect wallet to pay')}
                 </button>
+                {connected && balance !== null && (
+                  <p className={`hint mono ${balance < BigInt(req.sats) ? 'hint-bad' : ''}`}>
+                    Your wallet: {formatBch(balance)} {req.net === 'chipnet' ? '(Chipnet)' : ''}
+                    {balance < BigInt(req.sats) ? ', not enough for this order' : ''}
+                  </p>
+                )}
                 <p className="hint">
                   Check the seller's address with them before paying: <span className="mono addr-full">{seller}</span>
                 </p>
