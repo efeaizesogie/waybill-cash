@@ -19,6 +19,8 @@ const MIN_SATS = 2000;
 
 /** Item + price + refund window, shared by both forms. */
 function useOrderFields() {
+  const { net } = useWallet();
+  const testCoins = net === 'chipnet';
   const [item, setItem] = useState('');
   const [amount, setAmount] = useState('');
   const [cur, setCur] = useState<Currency>('NGN');
@@ -47,7 +49,7 @@ function useOrderFields() {
       <div className="field">
         <label htmlFor="amount">Price</label>
         <div className="amount-row">
-          <input id="amount" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ''))} placeholder={cur === 'NGN' ? '25000' : cur === 'USD' ? '15' : '0.001'} />
+          <input id="amount" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ''))} placeholder={cur === 'NGN' ? (testCoins ? '500' : '25000') : cur === 'USD' ? (testCoins ? '0.3' : '15') : '0.001'} />
           <div className="seg" role="radiogroup" aria-label="Currency">
             {(['NGN', 'USD', 'BCH'] as Currency[]).map((c) => (
               <button type="button" key={c} role="radio" aria-checked={cur === c} className={cur === c ? 'on' : ''} disabled={c !== 'BCH' && !rates} onClick={() => setCur(c)}>
@@ -57,7 +59,11 @@ function useOrderFields() {
           </div>
         </div>
         <span className={`hint mono ${tooSmall ? 'hint-bad' : ''}`}>
-          {sats ? `${formatBch(sats)}${tooSmall ? `, below the ${formatBch(MIN_SATS)} minimum` : ''}` : rates ? 'Converted at the live BCH price' : 'Live price unavailable, enter BCH'}
+          {sats
+            ? `${formatBch(sats)}${tooSmall ? `, below the ${formatBch(MIN_SATS)} minimum` : ''}`
+            : testCoins
+              ? 'Test coins: keep the price small, like ₦500'
+              : rates ? 'Converted at the live BCH price' : 'Live price unavailable, enter BCH'}
         </span>
       </div>
       <label className="field">

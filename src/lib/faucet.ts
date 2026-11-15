@@ -11,7 +11,7 @@ import { provider } from './chain';
  */
 const FAUCET_WIF = 'cSLq7siUVxKLvYx4NfxuTaC1qB6Qa9uqK29ues79bn3gx7g6Rcnu';
 export const FAUCET_ADDRESS = 'bchtest:qqeps7k0vwmpncfggeks3z26fzl6g3csgqvdszr3f6';
-export const FAUCET_SATS = 1_000_000n; // 0.01 test BCH per claim
+export const FAUCET_SATS = 500_000n; // 0.005 test BCH per claim: enough for several small test orders
 const FEE = 400n;
 const COOLDOWN_MS = 6 * 60 * 60 * 1000;
 const KEY = 'waybill.faucet.lastClaim';
