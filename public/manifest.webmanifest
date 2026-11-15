@@ -1,0 +1,23 @@
+{
+  "name": "Waybill: pay on delivery with BCH",
+  "short_name": "Waybill",
+  "description": "Pay on delivery, without the cash. The buyer's BCH stays locked until the parcel arrives, then the seller is paid.",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f4f2f0",
+  "theme_color": "#163300",
+  "categories": ["finance", "shopping"],
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Sell: create a payment link", "short_name": "Sell", "url": "./" },
+    { "name": "Get free test coins", "short_name": "Test coins", "url": "./?net=chipnet&faucet=1" }
+  ]
+}

@@ -8,6 +8,7 @@ import { ErrorNote } from '../components/Progress';
 import { listOrders, listRequests, saveRequest } from '../lib/store';
 import { binToHex, hash160 } from '@bitauth/libauth';
 import { Guide } from '../components/Guide';
+import { InstallApp } from '../components/InstallApp';
 
 const WINDOWS = [
   { blocks: 12, label: '2 hours (demo)' },
@@ -248,6 +249,7 @@ export function Home() {
             Sellers send a payment link. The buyer's BCH stays locked until the parcel reaches them, then the seller is paid in seconds.
           </p>
           <a className="hero-setup" href="#setup" onClick={(e) => { e.preventDefault(); document.getElementById('setup')?.scrollIntoView({ behavior: 'smooth' }); }}>New to BCH? Set up a wallet in 2 minutes</a>
+          <InstallApp className="hero-install" />
         </div>
 
         <div className="panel">

@@ -134,6 +134,9 @@ input::placeholder { color: var(--color-muted); }
 
 /* ---------- setup guide ---------- */
 .hero-setup { display: inline-block; margin-top: var(--space-lg); font-weight: 600; color: var(--color-ink); }
+.hero-install { display: block; margin-top: var(--space-sm); font-weight: 600; color: var(--color-ink-2); }
+.install-app { display: inline-grid; gap: var(--space-2xs); }
+.install-steps { display: block; }
 .guide { padding-block: var(--space-2xl); border-top: var(--rule-hair) solid var(--color-rule); }
 .guide-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: var(--space-md); margin-bottom: var(--space-lg); }
 .guide-head .section-title { margin-bottom: 0; }

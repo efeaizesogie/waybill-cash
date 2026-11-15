@@ -4,6 +4,7 @@ import { type Net, type Order, decodeOrder, decodeSecret, decodeHandover } from 
 import { ConnectDialog } from './components/ConnectDialog';
 import { Scanner } from './components/Scanner';
 import { FaucetDialog } from './components/FaucetDialog';
+import { InstallApp } from './components/InstallApp';
 import { Banner } from './components/Banner';
 import { Home } from './pages/Home';
 import { OrderPage, WaybillPage } from './pages/OrderPage';
@@ -190,6 +191,7 @@ export default function App() {
         <p className="footer-links">
           <a href="https://github.com/efeaizesogie/waybill-cash/blob/main/contracts/waybill-v2.cash">Read the contract</a>
           <a href="https://github.com/efeaizesogie/waybill-cash">Source code</a>
+          <InstallApp />
           <a href={NET === 'mainnet' ? '?net=chipnet' : './'}>{NET === 'mainnet' ? 'Use Chipnet test coins' : 'Back to mainnet'}</a>
         </p>
       </footer>
