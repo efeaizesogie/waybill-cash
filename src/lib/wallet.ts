@@ -5,6 +5,7 @@ import { sourceOutputToRelay } from '@wizardconnect/core/hdwalletv1-serialize';
 import { type Net, addressFromPubkey, DUST, DOORBELL_SATS } from './waybill';
 import { provider } from './chain';
 import { formatBch } from './price';
+import { withTimeout } from './errors';
 
 const RECEIVE = 0;
 const CHANGE = 1;
@@ -57,13 +58,13 @@ export async function lockFunds(opts: {
   note?: { sellerAddress: string; chunks: string[] };
   /** How long to wait for the wallet to approve before giving up with instructions. */
   timeoutMs?: number;
-  onStep?: (label: string) => void;
+  onStep?: (step: 'approve' | 'send') => void;
 }) {
   const { manager, net, contractAddress, note } = opts;
   const sats = opts.sats;
   const extra = note ? BigInt(DOORBELL_SATS) : 0n;
   const p = provider(net);
-  const { utxos } = await scanWallet(manager, net);
+  const { utxos } = await withTimeout(scanWallet(manager, net), 40_000, 'Checking your wallet');
 
   // Largest-first coin selection with a 1 sat/byte fee estimate.
   const sorted = [...utxos].sort((a, b) => (b.satoshis > a.satoshis ? 1 : -1));
@@ -109,7 +110,7 @@ export async function lockFunds(opts: {
     broadcast: false,
     userPrompt: wcObject.userPrompt,
   };
-  opts.onStep?.('Approve the lock in your wallet');
+  opts.onStep?.('approve');
   const abort = new AbortController();
   const timer = setTimeout(() => abort.abort(), opts.timeoutMs ?? 90_000);
   let response;
@@ -131,7 +132,7 @@ export async function lockFunds(opts: {
   }
   if (response.error) throw new Error(/reject/i.test(response.error) ? 'You declined the lock in your wallet. Nothing was sent.' : response.error);
 
-  opts.onStep?.('Sending');
-  const txid = await p.sendRawTransaction(response.signedTransaction);
+  opts.onStep?.('send');
+  const txid = await withTimeout(p.sendRawTransaction(response.signedTransaction), 45_000, 'Sending the lock');
   return txid;
 }

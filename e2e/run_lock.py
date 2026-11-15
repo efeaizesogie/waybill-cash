@@ -26,20 +26,43 @@ with sync_playwright() as p:
     btn.click(); pg.wait_for_timeout(3000)
     href = pg.locator('.connect-same a').get_attribute('href')
     uri = urllib.parse.unquote(href.split('uri=')[1])
-    wallet = subprocess.Popen(['node', 'e2e/sim-wallet.mjs', uri, 'chipnet'], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    import os
+    wallet = subprocess.Popen(['node', 'e2e/sim-wallet.mjs', uri, 'chipnet'], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, env={**os.environ, 'SIGN_DELAY_MS': '4000'})
     t0 = time.time()
     while time.time() - t0 < 40 and pg.locator('.connect-panel').count():
         pg.wait_for_timeout(500)
     print('[e2e] dialog closed after %.1fs' % (time.time() - t0), '| button:', btn.inner_text())
     btn.click()
+    shot = sys.argv[3] if len(sys.argv) > 3 else None
+    if shot:
+        pg.wait_for_timeout(1500)
+        pg.locator('.ticket-stub').screenshot(path=shot + '-progress.png')
     labels = []
     for _ in range(60):
         pg.wait_for_timeout(500)
         txt = btn.inner_text() if btn.count() else '(button gone)'
         if not labels or labels[-1] != txt: labels.append(txt)
         err = pg.locator('.form-error')
-        if err.count(): print('[e2e] ERROR shown:', err.inner_text()); break
-        if '#/o/' in pg.url: break
+        if err.count():
+            print('[e2e] ERROR shown:', err.inner_text())
+            if shot: pg.locator('.ticket-stub').screenshot(path=shot + '-error.png')
+            break
+        if '#/o/' in pg.url:
+            if shot:
+                pg.wait_for_timeout(1200)
+                pg.locator('.ticket').screenshot(path=shot + '-after.png')
+            if mode == 'mock':
+                pg.get_by_role('button', name='I have the parcel, pay the seller').click()
+                pg.get_by_role('button', name='Yes, pay the seller').click()
+                pg.wait_for_timeout(150)
+                if shot: pg.locator('.ticket-stub').screenshot(path=shot + '-paying.png')
+                for _ in range(40):
+                    pg.wait_for_timeout(500)
+                    stub = pg.locator('.ticket-stub').inner_text()
+                    if 'seller has been paid' in stub or pg.locator('.form-error').count(): break
+                print('[e2e] after pay:', pg.locator('.ticket-stub').inner_text().replace(chr(10), ' | ')[:200])
+                if shot: pg.locator('.ticket').screenshot(path=shot + '-paid.png')
+            break
     print('[e2e] button labels after Lock:', labels)
     print('[e2e] url now:', pg.url.split('#')[1][:12] if '#' in pg.url else pg.url)
     wallet.terminate()

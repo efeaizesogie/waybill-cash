@@ -118,6 +118,14 @@ export default function App() {
           )}
         </div>
       </header>
+      {wc.error && wc.state !== 'connected' && (
+        <div className="net-strip conn-error" role="alert">
+          <div className="container net-strip-row">
+            <span>Couldn’t start the wallet connection. Check your internet and try again.</span>
+            <button className="link-btn" onClick={connect}>Try again</button>
+          </div>
+        </div>
+      )}
       {NET === 'chipnet' && (
         <div className="net-strip">
           <div className="container net-strip-row">

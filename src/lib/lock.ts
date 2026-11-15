@@ -3,6 +3,15 @@ import { type Net, type Order, newSecret, hashSecret, encodeSecret, makeContract
 import { provider } from './chain';
 import { buyerIdentity, lockFunds } from './wallet';
 import { saveOrder } from './store';
+import { withTimeout } from './errors';
+
+export type LockStep = 'chain' | 'wallet' | 'approve' | 'send';
+export const LOCK_STEPS: { key: LockStep; label: string; hint?: string }[] = [
+  { key: 'chain', label: 'Reading the network' },
+  { key: 'wallet', label: 'Checking your wallet for coins' },
+  { key: 'approve', label: 'Approve the lock in your wallet', hint: 'Open your wallet. In Paytaca the request waits under Apps, then WizardConnect. In Cashonize, under Connect.' },
+  { key: 'send', label: 'Sending the lock to the network' },
+];
 
 /**
  * Create the buyer's side of an order and lock the money. Used by the 2-minute demo form and by a
@@ -17,12 +26,12 @@ export async function lockOrder(opts: {
   price?: string;
   windowBlocks: number;
   rid?: string;
-  onStep?: (label: string) => void;
+  onStep?: (step: LockStep) => void;
 }) {
   const { manager, net } = opts;
   const buyer = buyerIdentity(manager, net);
-  opts.onStep?.('Reading the chain');
-  const height = await provider(net).getBlockHeight();
+  opts.onStep?.('chain');
+  const height = await withTimeout(provider(net).getBlockHeight(), 20_000, 'Reading the network');
   const secret = newSecret();
   const order: Order = {
     v: 1,
@@ -41,7 +50,7 @@ export async function lockOrder(opts: {
   // Keep the code before anything is signed, so it can never be lost after paying.
   saveOrder(order, encodeSecret(secret));
   const contract = makeContract(order, provider(net));
-  opts.onStep?.('Checking your wallet');
+  opts.onStep?.('wallet');
   const txid = await lockFunds({
     onStep: opts.onStep,
     manager,

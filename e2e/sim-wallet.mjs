@@ -45,6 +45,8 @@ const mgr = new WalletConnectionManager(adapter);
 mgr.on('connectionStatusChanged', (id, s) => log('status', s));
 mgr.on('pendingSignRequest', async ({ connectionId, request }) => {
   log('SIGN REQUEST', 'inputs', request.inputPaths.length, 'prompt:', request.transaction.userPrompt);
+  const delay = Number(process.env.SIGN_DELAY_MS || 0);
+  if (delay) await new Promise((r) => setTimeout(r, delay));
   try {
     const hex = sign(request);
     await mgr.sendSignResponse(connectionId, request.sequence, hex);

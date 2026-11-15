@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { scanWallet } from '../lib/wallet';
 import { decodeRequest, addressFromPkh } from '../lib/waybill';
 import { useWallet } from '../lib/walletContext';
-import { lockOrder } from '../lib/lock';
+import { useLock, LockProgress } from '../components/LockProgress';
+import { ErrorNote } from '../components/Progress';
 import { orderForRequest } from '../lib/store';
 import { formatBch } from '../lib/price';
 import { blocksToTime } from '../lib/chain';
@@ -11,8 +12,7 @@ import { blocksToTime } from '../lib/chain';
 export function RequestPage({ code }: { code: string }) {
   const wallet = useWallet();
   const req = useMemo(() => { try { return decodeRequest(code); } catch { return null; } }, [code]);
-  const [busy, setBusy] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const lock = useLock();
   const [balance, setBalance] = useState<bigint | null>(null);
   const isConnected = wallet.state === 'connected' && !!wallet.manager;
   useEffect(() => {
@@ -42,26 +42,18 @@ export function RequestPage({ code }: { code: string }) {
   const fixNetHref = `${location.pathname}${req.net === 'chipnet' ? '?net=chipnet' : ''}${location.hash}`;
 
   async function pay() {
-    setError(null);
     if (!connected || !wallet.manager) return wallet.openConnect();
-    try {
-      const orderCode = await lockOrder({
-        manager: wallet.manager,
-        net: req!.net,
-        sellerPkh: req!.sellerPkh,
-        sats: req!.sats,
-        item: req!.item,
-        price: req!.price,
-        windowBlocks: req!.windowBlocks,
-        rid: req!.rid,
-        onStep: setBusy,
-      });
-      location.hash = `#/o/${orderCode}`;
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setBusy(null);
-    }
+    const orderCode = await lock.run({
+      manager: wallet.manager,
+      net: req!.net,
+      sellerPkh: req!.sellerPkh,
+      sats: req!.sats,
+      item: req!.item,
+      price: req!.price,
+      windowBlocks: req!.windowBlocks,
+      rid: req!.rid,
+    });
+    if (orderCode) location.hash = `#/o/${orderCode}`;
   }
 
   return (
@@ -105,9 +97,14 @@ export function RequestPage({ code }: { code: string }) {
             ) : (
               <>
                 <p className="stub-lead">Your money is locked, not sent. The seller only gets it when you confirm the parcel arrived.</p>
-                <button className="btn btn-primary btn-block" onClick={pay} disabled={!!busy}>
-                  {busy ?? (connected ? `Lock ${req.price ?? formatBch(req.sats)}` : 'Connect wallet to pay')}
-                </button>
+                {lock.step ? (
+                  <LockProgress step={lock.step} />
+                ) : (
+                  <button className="btn btn-primary btn-block" onClick={pay}>
+                    {connected ? `Lock ${req.price ?? formatBch(req.sats)}` : 'Connect wallet to pay'}
+                  </button>
+                )}
+                {lock.error && <ErrorNote message={lock.error.message} detail={lock.error.detail} />}
                 {connected && balance !== null && (
                   <p className={`hint mono ${balance < BigInt(req.sats) ? 'hint-bad' : ''}`}>
                     Your wallet: {formatBch(balance)} {req.net === 'chipnet' ? '(Chipnet)' : ''}
@@ -119,7 +116,6 @@ export function RequestPage({ code }: { code: string }) {
                 </p>
               </>
             )}
-            {error && <p className="form-error" role="alert">{error}</p>}
           </div>
         </div>
       </article>

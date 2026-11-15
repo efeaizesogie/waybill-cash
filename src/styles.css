@@ -32,6 +32,8 @@ body { font-stretch: 100%; }
 .net-strip-row { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--space-2xs) var(--space-md); }
 .net-strip { padding-block: var(--space-xs); font-size: var(--text-sm); color: var(--color-ink-2); background: color-mix(in oklab, var(--color-warn) 12%, var(--color-paper)); border-block: var(--rule-hair) solid color-mix(in oklab, var(--color-warn) 30%, var(--color-paper)); }
 .net-strip a { font-weight: 600; color: var(--color-ink); }
+.conn-error { background: color-mix(in oklab, var(--color-error) 10%, var(--color-paper)); border-color: color-mix(in oklab, var(--color-error) 30%, var(--color-paper)); color: var(--color-ink); }
+.conn-error .link-btn { font-weight: 600; }
 .topbar .btn { white-space: nowrap; }
 
 /* ---------- buttons ---------- */
@@ -170,6 +172,23 @@ input::placeholder { color: var(--color-muted); }
 
 @media (max-width: 26rem) {
   .wide-only { display: none; }
+}
+
+/* ---------- progress + errors ---------- */
+.progress { display: grid; gap: var(--space-xs); width: 100%; }
+.progress-track { position: relative; height: 6px; border-radius: var(--radius-pill); background: color-mix(in oklab, currentColor 16%, transparent); overflow: hidden; }
+.progress-fill { display: block; width: 100%; height: 100%; border-radius: inherit; background: var(--color-accent); transform-origin: left center; transition: transform var(--dur-long) var(--ease-out); }
+.progress-indeterminate .progress-fill { width: 38%; animation: progress-slide 1.3s var(--ease-in-out) infinite; }
+@keyframes progress-slide { from { transform: translateX(-110%); } to { transform: translateX(280%); } }
+.progress-label { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-2xs) var(--space-sm); font-weight: 600; }
+.progress-count { font-size: var(--text-sm); font-weight: 400; opacity: 0.75; }
+.panel .progress-fill { background: var(--color-forest); color: var(--color-on-forest); }
+.error-note { display: grid; gap: var(--space-2xs); width: 100%; }
+.error-actions { display: flex; flex-wrap: wrap; gap: var(--space-md); font-size: var(--text-sm); }
+.error-actions:empty { display: none; }
+.error-detail { margin: 0; max-height: 140px; overflow: auto; padding: var(--space-sm); border-radius: var(--radius-input); background: color-mix(in oklab, currentColor 8%, transparent); font-family: var(--font-outlier); font-size: var(--text-xs); line-height: 1.4; white-space: pre-wrap; overflow-wrap: anywhere; }
+@media (prefers-reduced-motion: reduce) {
+  .progress-indeterminate .progress-fill { animation: none; width: 100%; opacity: 0.45; }
 }
 
 /* ---------- seller links ---------- */

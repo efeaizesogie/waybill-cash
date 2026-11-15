@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { type Order, decodeRequest } from '../lib/waybill';
 import { findLockForRequest } from '../lib/chain';
-import { OrderView, pageBase } from '../components/OrderView';
+import { OrderView } from '../components/OrderView';
+import { shareLink } from '../lib/links';
 import { Qr } from '../components/Qr';
 import { formatBch } from '../lib/price';
+import { Progress, ErrorNote } from '../components/Progress';
+import { friendlyError } from '../lib/errors';
 
 /**
  * The seller's page for a payment link (#/s/). Waits for the buyer's lock (found through the
@@ -14,6 +17,14 @@ export function SellerPage({ code }: { code: string }) {
   const req = useMemo(() => { try { return decodeRequest(code); } catch { return null; } }, [code]);
   const [order, setOrder] = useState<Order | null>(null);
   const [checked, setChecked] = useState(false);
+  const [lastCheck, setLastCheck] = useState<number | null>(null);
+  const [checkError, setCheckError] = useState<{ message: string; detail?: string } | null>(null);
+  const [found, setFound] = useState(false);
+  const [, tick] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => tick((n) => n + 1), 1000);
+    return () => clearInterval(t);
+  }, []);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -25,9 +36,18 @@ export function SellerPage({ code }: { code: string }) {
         const hit = await findLockForRequest(req);
         if (!alive) return;
         setChecked(true);
-        if (hit) return setOrder(hit.order);
-      } catch {
-        if (alive) setChecked(true);
+        setLastCheck(Date.now());
+        setCheckError(null);
+        if (hit) {
+          setFound(true);
+          setTimeout(() => alive && setOrder(hit.order), 900);
+          return;
+        }
+      } catch (e) {
+        if (alive) {
+          setChecked(true);
+          setCheckError(friendlyError(e));
+        }
       }
       if (alive) timer = setTimeout(run, 7000);
     };
@@ -46,7 +66,7 @@ export function SellerPage({ code }: { code: string }) {
     );
   }
 
-  const payLink = `${pageBase()}#/r/${code}`;
+  const payLink = shareLink(`r/${code}`);
   const waText = encodeURIComponent(`Pay for "${req.item}"${req.price ? ` (${req.price})` : ''} with Waybill. Your money stays locked until you receive it: ${payLink}`);
 
   if (order) {
@@ -76,6 +96,15 @@ export function SellerPage({ code }: { code: string }) {
         <div className="ticket-tear" aria-hidden="true" />
         <div className="ticket-stub">
           <div className="stub-block">
+            {found ? (
+              <Progress steps={['Watching', 'Payment found', 'Opening the order']} current={2} label="The buyer paid. Opening your order" />
+            ) : (
+              <Progress
+                label={checked ? 'Watching your address for the buyer’s payment' : 'Connecting to the Bitcoin Cash network'}
+                hint={lastCheck ? `Last checked ${Math.max(0, Math.round((Date.now() - lastCheck) / 1000))}s ago. Checks again every few seconds.` : undefined}
+              />
+            )}
+            {checkError && <ErrorNote message={checkError.message} detail={checkError.detail} />}
             <p className="stub-lead">Send this link to your buyer. This page turns to Locked by itself when they pay. Keep it open or come back later.</p>
             <a className="btn btn-primary btn-block" href={`https://wa.me/?text=${waText}`} target="_blank" rel="noreferrer">Send to buyer on WhatsApp</a>
             <div className="stub-actions">
@@ -91,6 +120,7 @@ export function SellerPage({ code }: { code: string }) {
             <details className="pay-qr">
               <summary>Buyer is with you? Show a QR</summary>
               <Qr value={payLink} size={240} ecc="L" label="Payment link for the buyer" />
+              <p className="hint">The buyer scans it with their phone’s camera app or Waybill’s Scan button, not with their wallet app. It opens this payment page on their phone.</p>
             </details>
           </div>
         </div>

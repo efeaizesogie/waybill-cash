@@ -118,7 +118,7 @@ export function Guide() {
             <p>Your money is locked, not sent. Keep using this phone: your release code is saved on it.</p>
           </Step>
           <Step n={4} title="At the door: scan, check, confirm" visual={<button className="btn btn-primary" onClick={openScanner}>Scan code</button>}>
-            <p>Tap Scan code and scan the code on the rider's phone. It opens your order. Check the parcel, then tap I have the parcel, pay the seller. No rider code? Open your waybill and confirm there.</p>
+            <p>Tap Scan code on Waybill (or use your phone's camera app) and scan the code on the rider's phone. Don't use your wallet's scanner: it can't open Waybill codes. It opens your order. Check the parcel, then tap I have the parcel, pay the seller. No rider code? Open your waybill and confirm there.</p>
             <p>Parcel never came? After the deadline, open the waybill and tap Refund. Only you can receive it.</p>
           </Step>
         </ol>

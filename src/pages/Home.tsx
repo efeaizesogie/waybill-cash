@@ -3,7 +3,8 @@ import { useWallet } from '../lib/walletContext';
 import { type Currency, type Rates, getRates, toSats, formatMoney, formatBch } from '../lib/price';
 import { pkhFromAddress, netFromAddress, decodeOrder, newRequestId } from '../lib/waybill';
 import { buyerIdentity, scanWallet } from '../lib/wallet';
-import { lockOrder } from '../lib/lock';
+import { useLock, LockProgress } from '../components/LockProgress';
+import { ErrorNote } from '../components/Progress';
 import { listOrders, listRequests, saveRequest } from '../lib/store';
 import { binToHex, hash160 } from '@bitauth/libauth';
 import { Guide } from '../components/Guide';
@@ -155,7 +156,7 @@ function SellForm() {
 function TryForm() {
   const wallet = useWallet();
   const f = useOrderFields();
-  const [busy, setBusy] = useState<string | null>(null);
+  const lock = useLock();
   const [error, setError] = useState<string | null>(null);
   const [balance, setBalance] = useState<bigint | null>(null);
   const connected = wallet.state === 'connected' && !!wallet.manager;
@@ -177,24 +178,18 @@ function TryForm() {
     if (!connected || !wallet.manager) return wallet.openConnect();
     const bad = f.check('you are buying');
     if (bad) return setError(bad);
-    try {
-      const pub = wallet.manager.getPubkey(0, 1n) ?? wallet.manager.getPubkey(0, 0n)!;
-      const code = await lockOrder({
-        manager: wallet.manager,
-        net: wallet.net,
-        sellerPkh: binToHex(hash160(pub)),
-        sats: f.sats!,
-        item: f.item,
-        price: f.price,
-        windowBlocks: f.windowBlocks,
-        onStep: setBusy,
-      });
-      location.hash = `#/o/${code}`;
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setBusy(null);
-    }
+    const pub = wallet.manager.getPubkey(0, 1n) ?? wallet.manager.getPubkey(0, 0n);
+    if (!pub) return setError('Your wallet hasn’t shared its addresses yet. Disconnect and connect again.');
+    const code = await lock.run({
+      manager: wallet.manager,
+      net: wallet.net,
+      sellerPkh: binToHex(hash160(pub)),
+      sats: f.sats!,
+      item: f.item,
+      price: f.price,
+      windowBlocks: f.windowBlocks,
+    });
+    if (code) location.hash = `#/o/${code}`;
   }
 
   return (
@@ -202,9 +197,14 @@ function TryForm() {
       <p className="hint">You play buyer and seller with your own wallet, so a full run only costs network fees (under ₦5).</p>
       {f.fields('What are you buying?', 'Refund me if it hasn’t arrived in')}
       {error && <p className="form-error" role="alert">{error}</p>}
-      <button className="btn btn-primary btn-block" type="submit" disabled={!!busy}>
-        {busy ?? (connected ? `Lock ${f.sats ? formatBch(f.sats) : 'payment'}` : 'Connect wallet to lock')}
-      </button>
+      {lock.error && <ErrorNote message={lock.error.message} detail={lock.error.detail} />}
+      {lock.step ? (
+        <LockProgress step={lock.step} />
+      ) : (
+        <button className="btn btn-primary btn-block" type="submit">
+          {connected ? `Lock ${f.sats ? formatBch(f.sats) : 'payment'}` : 'Connect wallet to lock'}
+        </button>
+      )}
       {connected && balance !== null && <span className="hint mono">Wallet balance {formatBch(balance)}</span>}
     </form>
   );
