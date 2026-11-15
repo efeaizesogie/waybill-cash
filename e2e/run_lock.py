@@ -11,13 +11,15 @@ with sync_playwright() as p:
     b = p.chromium.launch()
     pg = b.new_page(viewport={'width': 390, 'height': 844}, is_mobile=True, has_touch=True)
     pg.on('console', lambda m: print('[page]', m.type, m.text[:220]) if m.type in ('error', 'warning') else None)
-    pg.goto(url, wait_until='networkidle'); pg.wait_for_timeout(1500)
-    if mode == 'mock':
-        print('[e2e] funded mock address', pg.evaluate("import('/e2e/devmock.ts').then(m => m.setup())"))
+    # Payment links are built from the source on the local dev server, then opened on `base`.
+    pg.goto('http://localhost:5174/?net=chipnet', wait_until='networkidle'); pg.wait_for_timeout(1000)
     code = pg.evaluate("""async () => {
       const w = await import('/src/lib/waybill.ts');
       return w.encodeRequest({ net: 'chipnet', sellerPkh: '22'.repeat(20), sats: 50000, item: 'Test shoes', price: '₦15,000', windowBlocks: 12, rid: w.newRequestId() });
     }""")
+    pg.goto(url, wait_until='networkidle'); pg.wait_for_timeout(1500)
+    if mode == 'mock':
+        print('[e2e] funded mock address', pg.evaluate("import('/e2e/devmock.ts').then(m => m.setup())"))
     pg.evaluate(f"location.hash = '#/r/{code}'"); pg.wait_for_timeout(800)
     btn = pg.locator('.ticket-stub .btn-primary')
     print('[e2e] button before connect:', btn.inner_text())
