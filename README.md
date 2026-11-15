@@ -1,8 +1,14 @@
 # Waybill
 
-**Pay on delivery, without the cash.** A buyer locks BCH in a contract made for one order. The seller is paid the moment the buyer's code is scanned at the door. If the parcel never comes, the money goes back to the buyer.
+**Pay on delivery, without the cash.** A seller sends a payment link. The buyer's BCH is locked in a contract made for that one order. When the parcel arrives, the buyer confirms and the seller is paid, minus a 0.5% platform fee. If the parcel never comes, the money goes back to the buyer.
 
 Live: https://efeaizesogie.github.io/waybill-cash/ · Built for BCH BLAZE 2026.
+
+![Waybill: seller sends a link, buyer locks the money, rider shows the code, buyer confirms and the seller is paid](docs/waybill-flow.png)
+
+**[Watch the 90-second demo](docs/waybill-demo.mp4)**: the whole flow with voiceover, recorded on the live app (Chipnet test network, simulated wallet).
+
+![Waybill home page: create a payment link or try it in 2 minutes](docs/waybill-home.png)
 
 ## Why
 

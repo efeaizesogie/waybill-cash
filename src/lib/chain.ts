@@ -50,16 +50,19 @@ async function readStatus(order: Order): Promise<Status> {
   const history = (await (p as ElectrumNetworkProvider).performRequest('blockchain.address.get_history', contract.address)) as unknown as HistoryItem[];
   if (!history?.length) return { kind: 'waiting' };
 
+  // The settle tx is the one that spends the contract: it pays nothing back to the contract address.
+  // Its first output says which way it went: seller (released, plus the fee output on v2) or buyer (refunded).
+  const contractLock = lockOf(contract.address);
   const sellerLock = lockOf(addressFromPkh(order.sellerPkh, order.net));
+  const buyerLock = lockOf(addressFromPkh(order.buyerPkh, order.net));
   for (const item of [...history].reverse()) {
     const raw = await p.getRawTransaction(item.tx_hash);
     const tx = decodeTransaction(hexToBin(raw));
-    if (typeof tx === 'string') continue;
-    // The settle tx spends the contract and has exactly one output.
-    if (tx.outputs.length === 1 && item.tx_hash !== order.fundTxid) {
-      const out = binToHex(tx.outputs[0].lockingBytecode);
-      return out === sellerLock ? { kind: 'released', txid: item.tx_hash } : { kind: 'refunded', txid: item.tx_hash };
-    }
+    if (typeof tx === 'string' || item.tx_hash === order.fundTxid) continue;
+    if (tx.outputs.some((o) => binToHex(o.lockingBytecode) === contractLock)) continue;
+    const first = binToHex(tx.outputs[0]?.lockingBytecode ?? new Uint8Array());
+    if (first === sellerLock) return { kind: 'released', txid: item.tx_hash };
+    if (first === buyerLock) return { kind: 'refunded', txid: item.tx_hash };
   }
   return { kind: 'waiting' };
 }

@@ -14,6 +14,16 @@ import {
 import { toUint8Array, toBigInt } from '@wizardconnect/core';
 
 const mock = new MockNetworkProvider({ updateUtxoSet: true });
+// Answer Electrum's get_history from the mock's own transaction log, like Fulcrum.
+(mock as any).performRequest = async (_name: string, address: string) => {
+  const { cashAddressToLockingBytecode, decodeTransaction: dt, hexToBin: h2b, binToHex: b2h } = await import('@bitauth/libauth');
+  const lb = cashAddressToLockingBytecode(address);
+  if (typeof lb === 'string') return [];
+  const want = b2h(lb.bytecode);
+  const all = Object.entries((mock as any).transactionMap as Record<string, string>).map(([txid, hex]) => ({ txid, tx: dt(h2b(hex)) as any }));
+  const pays = new Set(all.filter(({ tx }) => tx.outputs.some((o: any) => b2h(o.lockingBytecode) === want)).map((d) => d.txid));
+  return all.filter(({ txid, tx }) => pays.has(txid) || tx.inputs.some((i: any) => pays.has(b2h(i.outpointTransactionHash)))).map(({ txid }) => ({ tx_hash: txid, height: 0 }));
+};
 
 const { lockFunds, buyerIdentity } = await import('../src/lib/wallet');
 const chain = await import('../src/lib/chain');
@@ -120,6 +130,31 @@ describe('buyer locks, then the seller is paid', () => {
 
     await chain.release(order, utxo, secret);
     expect((await mock.getUtxos(sellerAddr)).map((u) => u.satoshis)).toContain(49_500n);
+    expect((await chain.getStatus(order)).kind).toBe('released');
+  });
+
+  it('a v2 order with the fee shows Released after the seller is paid, and Refunded after a refund', async () => {
+    fundWallet(30_000_000n);
+    const req = { net: 'chipnet' as const, sellerPkh: binToHex(hash160(pub(0, 5))), sats: 5_000_000, item: 'Bag', windowBlocks: 12, rid: w.newRequestId() };
+    const buyer = buyerIdentity(manager, 'chipnet');
+    for (const outcome of ['released', 'refunded'] as const) {
+      const secret = w.newSecret();
+      const note = { rid: req.rid, buyerPkh: buyer.pkh, releaseHash: w.hashSecret(secret), refundAfter: HEIGHT + 12 };
+      const order = w.orderFromRequest(req, note);
+      expect(order.v).toBe(2);
+      const contract = w.makeContract(order, mock);
+      await lockFunds({ manager, net: 'chipnet', contractAddress: contract.address, sats: 5_000_000n, itemLabel: 'Bag', note: { sellerAddress: w.addressFromPkh(req.sellerPkh, 'chipnet'), chunks: w.noteChunks(note) } });
+      expect((await chain.getStatus(order)).kind).toBe('locked');
+      const [utxo] = await contract.getUtxos();
+      if (outcome === 'released') {
+        await chain.release(order, utxo, secret);
+      } else {
+        mock.setBlockHeight(HEIGHT + 12);
+        await chain.refund(order, utxo);
+        mock.setBlockHeight(HEIGHT);
+      }
+      expect((await chain.getStatus(order)).kind).toBe(outcome);
+    }
   });
 
   it('spends coins spread across receive and change addresses', async () => {

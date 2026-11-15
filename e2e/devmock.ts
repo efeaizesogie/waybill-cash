@@ -5,7 +5,7 @@ import { deriveHdPrivateNodeFromSeed, deriveHdPath, deriveHdPrivateNodeChild, se
 import { useProviderForTests } from '../src/lib/chain';
 import { addressFromPkh } from '../src/lib/waybill';
 
-export function setup() {
+export function setup(fundSats = 2_000_000) {
   const mock = new MockNetworkProvider({ updateUtxoSet: true });
   mock.setBlockHeight(332_400);
   const root = deriveHdPrivateNodeFromSeed(new Uint8Array(64).fill(7)) as never;
@@ -14,7 +14,7 @@ export function setup() {
   const node = deriveHdPrivateNodeChild(recv, 0) as { privateKey: Uint8Array };
   const pub = secp256k1.derivePublicKeyCompressed(node.privateKey) as Uint8Array;
   const addr = addressFromPkh(binToHex(hash160(pub)), 'chipnet');
-  mock.addUtxo(addr, randomUtxo({ satoshis: 2_000_000n }));
+  mock.addUtxo(addr, randomUtxo({ satoshis: BigInt(fundSats) }));
   // Electrum's get_history, answered from the mock's own transaction log (newest last, like Fulcrum).
   const m = mock as unknown as { transactionMap: Record<string, string>; performRequest: (n: string, a: string) => Promise<unknown> };
   m.performRequest = async (name: string, address: string) => {
