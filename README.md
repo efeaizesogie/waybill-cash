@@ -27,14 +27,16 @@ Release and refund need **no signatures**: the covenant enforces where the money
 
 ## The contract
 
-[`contracts/waybill.cash`](contracts/waybill.cash) (CashScript 0.14, 81 bytes):
+[`contracts/waybill-v2.cash`](contracts/waybill-v2.cash) (CashScript 0.14, 134 bytes), used for every new order:
 
-- `release(secret)`: `sha256(secret) == releaseHash`, one input, one output, output is P2PKH to the seller, and fee ≤ `maxFee`.
-- `refund()`: `tx.time >= refundAfter`, one input, one output, output is P2PKH to the buyer, and fee ≤ `maxFee`.
+- `release(secret)`: `sha256(secret) == releaseHash`, one input, output 0 is P2PKH to the seller. When 0.5% of the amount clears dust, exactly two outputs and output 1 pays at least 0.5% to the Waybill developer, taken from the seller's side; otherwise one output. The network fee is capped by `maxFee`.
+- `refund()`: `tx.time >= refundAfter`, one input, one output, P2PKH to the buyer, no platform fee.
+
+[`contracts/waybill.cash`](contracts/waybill.cash) is the original fee-free version; orders made with it keep working.
 
 The secret is 128 bits and travels as a QR code. A short PIN would be brute-forceable, because the redeem script (and so the hash) is public.
 
-The tests in [`test/waybill.test.ts`](test/waybill.test.ts) cover paying the seller, a wrong code, redirecting the payout, burning it as fee, skimming with a second output, refunding early, refunding after the deadline, and redirecting the refund.
+The tests in [`test/`](test/) cover the fee (paid to the developer, can't be skipped, redirected, underpaid or used to shortchange the seller, none on refunds or dust-sized orders), paying the seller, a wrong code, redirecting the payout, burning it as fee, skimming with a second output, refunding early, refunding after the deadline, and redirecting the refund.
 
 ## No backend
 

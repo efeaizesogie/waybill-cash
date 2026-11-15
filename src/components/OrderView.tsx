@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { type Order, decodeOrder, decodeSecret, secretMatches, encodeHandover, encodeWaybill } from '../lib/waybill';
+import { type Order, sellerPayout, decodeOrder, decodeSecret, secretMatches, encodeHandover, encodeWaybill } from '../lib/waybill';
 import { useWallet } from '../lib/walletContext';
 import { secretFor } from '../lib/store';
 import { useStatus } from '../lib/useStatus';
@@ -38,7 +38,7 @@ export function OrderView({ order, fromScan = false }: { order: Order; fromScan?
   const height = status.kind === 'locked' ? status.height : undefined;
   const refundable = status.kind === 'locked' && status.height >= order.refundAfter;
   const utxo = status.kind === 'locked' ? status.utxo : null;
-  const payout = utxo ? formatBch(Number(utxo.satoshis) - 500) : '';
+  const payout = utxo ? formatBch(sellerPayout(utxo.satoshis, order.v)) : '';
   const waybillLink = shareLink(`w/${encodeWaybill(order)}`);
   const handoverLink = secret ? shareLink(`x/${encodeHandover(order, secret)}`) : '';
 

@@ -1,5 +1,5 @@
 import type { DappConnectionManager } from '@wizardconnect/dapp';
-import { type Net, type Order, newSecret, hashSecret, encodeSecret, makeContract, MAX_FEE, addressFromPkh, noteChunks } from './waybill';
+import { type Net, type Order, ORDER_VERSION, newSecret, hashSecret, encodeSecret, makeContract, MAX_FEE, addressFromPkh, noteChunks } from './waybill';
 import { provider } from './chain';
 import { buyerIdentity, lockFunds } from './wallet';
 import { saveOrder } from './store';
@@ -34,7 +34,7 @@ export async function lockOrder(opts: {
   const height = await withTimeout(provider(net).getBlockHeight(), 20_000, 'Reading the network');
   const secret = newSecret();
   const order: Order = {
-    v: 1,
+    v: ORDER_VERSION,
     net,
     buyerPkh: buyer.pkh,
     sellerPkh: opts.sellerPkh,

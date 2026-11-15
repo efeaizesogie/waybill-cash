@@ -19,12 +19,14 @@ import {
   binToUtf8,
 } from '@bitauth/libauth';
 import artifact from './waybill.artifact';
+import artifactV2 from './waybill-v2.artifact';
+import { DEV_FEE_ADDRESS } from './config';
 
 export type Net = 'mainnet' | 'chipnet';
 
 /** Everything needed to rebuild the contract. Lives in the share link, no backend. */
 export interface Order {
-  v: 1;
+  v: 1 | 2; // 2 = with the 0.5% platform fee
   net: Net;
   buyerPkh: string; // hex, 20 bytes
   sellerPkh: string; // hex, 20 bytes
@@ -75,28 +77,51 @@ export function addressFromPubkey(pubkey: Uint8Array, net: Net): string {
   return addressFromPkh(binToHex(hash160(pubkey)), net);
 }
 
+/** Current order version for anything created now. */
+export const ORDER_VERSION = 2 as const;
+export const PLATFORM_FEE_DIVISOR = 200n; // 0.5%
+export const FEE_DUST = 546n;
+export const devFeePkh = () => pkhFromAddress(DEV_FEE_ADDRESS);
+
+/** The platform fee the contract demands on release: 0.5% of the locked amount, or 0 if below dust. */
+export function platformFee(amount: bigint | number, v: 1 | 2): bigint {
+  if (v !== 2) return 0n;
+  const fee = BigInt(amount) / PLATFORM_FEE_DIVISOR;
+  return fee >= FEE_DUST ? fee : 0n;
+}
+
+/** What the seller receives when the buyer confirms: amount minus platform fee minus network fee. */
+export function sellerPayout(amount: bigint | number, v: 1 | 2): bigint {
+  return BigInt(amount) - platformFee(amount, v) - settleFee();
+}
+
 export function makeContract(order: Order, provider: NetworkProvider) {
-  return new Contract(
-    artifact,
-    [
-      hexToBin(order.buyerPkh),
-      hexToBin(order.sellerPkh),
-      hexToBin(order.releaseHash),
-      BigInt(order.refundAfter),
-      BigInt(order.maxFee),
-    ],
-    { provider, contractType: 'p2sh32' },
-  );
+  const args = [
+    hexToBin(order.buyerPkh),
+    hexToBin(order.sellerPkh),
+    hexToBin(order.releaseHash),
+    BigInt(order.refundAfter),
+    BigInt(order.maxFee),
+  ] as const;
+  if (order.v === 2) {
+    return new Contract(artifactV2, [...args, hexToBin(devFeePkh())], { provider, contractType: 'p2sh32' }) as unknown as Contract<typeof artifact>;
+  }
+  return new Contract(artifact, [...args], { provider, contractType: 'p2sh32' });
 }
 
 type WaybillContract = ReturnType<typeof makeContract>;
 
-/** The covenant forces a single output to the seller; fee comes out of the locked amount. */
+/**
+ * Pay the seller. v1: one output to the seller. v2: seller output plus the 0.5% platform fee to the
+ * developer (when it clears dust). The network fee comes out of the locked amount either way.
+ */
 export function buildRelease(contract: WaybillContract, order: Order, utxo: SpendableUtxo, secret: Uint8Array, provider: NetworkProvider) {
-  const fee = settleFee();
-  return new TransactionBuilder({ provider })
+  const fee = platformFee(utxo.satoshis, order.v);
+  const builder = new TransactionBuilder({ provider })
     .addInput(utxo, contract.unlock.release(secret))
-    .addOutput({ to: addressFromPkh(order.sellerPkh, order.net), amount: utxo.satoshis - fee });
+    .addOutput({ to: addressFromPkh(order.sellerPkh, order.net), amount: utxo.satoshis - fee - settleFee() });
+  if (fee > 0n) builder.addOutput({ to: addressFromPkh(devFeePkh(), order.net), amount: fee });
+  return builder;
 }
 
 export function buildRefund(contract: WaybillContract, order: Order, utxo: SpendableUtxo, provider: NetworkProvider) {
@@ -126,7 +151,7 @@ export function encodeOrder(order: Order): string {
 
 export function decodeOrder(code: string): Order {
   const order = JSON.parse(binToUtf8(fromB64url(code))) as Order;
-  if (order.v !== 1 || !/^[0-9a-f]{40}$/.test(order.buyerPkh) || !/^[0-9a-f]{40}$/.test(order.sellerPkh) || !/^[0-9a-f]{64}$/.test(order.releaseHash)) {
+  if ((order.v !== 1 && order.v !== 2) || !/^[0-9a-f]{40}$/.test(order.buyerPkh) || !/^[0-9a-f]{40}$/.test(order.sellerPkh) || !/^[0-9a-f]{64}$/.test(order.releaseHash)) {
     throw new Error('This waybill link is broken.');
   }
   return order;
@@ -162,7 +187,7 @@ export function encodeHandover(order: Order, secret: Uint8Array): string {
   const buf = new Uint8Array(1 + 1 + 20 + 20 + 4 + 2 + 8 + 16 + item.length);
   const dv = new DataView(buf.buffer);
   let o = 0;
-  buf[o++] = 2;
+  buf[o++] = order.v === 2 ? 12 : 2;
   buf[o++] = order.net === 'mainnet' ? 0 : 1;
   buf.set(hexToBin(order.buyerPkh), o); o += 20;
   buf.set(hexToBin(order.sellerPkh), o); o += 20;
@@ -176,7 +201,8 @@ export function encodeHandover(order: Order, secret: Uint8Array): string {
 
 export function decodeHandover(code: string): { order: Order; secret: Uint8Array } {
   const buf = fromB64url(code);
-  if (buf.length < 72 || buf[0] !== 2) throw new Error('This handover code is broken.');
+  if (buf.length < 72 || (buf[0] !== 2 && buf[0] !== 12)) throw new Error('This handover code is broken.');
+  const v: 1 | 2 = buf[0] === 12 ? 2 : 1;
   const dv = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
   let o = 1;
   const net: Net = buf[o++] === 0 ? 'mainnet' : 'chipnet';
@@ -187,7 +213,7 @@ export function decodeHandover(code: string): { order: Order; secret: Uint8Array
   const sats = Number(dv.getBigUint64(o)); o += 8;
   const secret = buf.slice(o, o + 16); o += 16;
   const item = binToUtf8(buf.slice(o)) || 'Order';
-  const order: Order = { v: 1, net, buyerPkh, sellerPkh, releaseHash: hashSecret(secret), refundAfter, maxFee, sats, item, created: 0 };
+  const order: Order = { v, net, buyerPkh, sellerPkh, releaseHash: hashSecret(secret), refundAfter, maxFee, sats, item, created: 0 };
   return { order, secret };
 }
 
@@ -196,6 +222,7 @@ export function decodeHandover(code: string): { order: Order; secret: Uint8Array
 // (their refund address and the secret's hash) when they lock. `rid` ties the lock back to this request.
 
 export interface PaymentRequest {
+  v?: 1 | 2; // 2 (default for new links) = orders carry the 0.5% platform fee
   net: Net;
   sellerPkh: string;
   sats: number;
@@ -220,7 +247,7 @@ export function encodeRequest(req: PaymentRequest): string {
   const buf = new Uint8Array(1 + 1 + 20 + 8 + 2 + 8 + 1 + item.length + price.length);
   const dv = new DataView(buf.buffer);
   let o = 0;
-  buf[o++] = 3;
+  buf[o++] = (req.v ?? ORDER_VERSION) === 2 ? 13 : 3;
   buf[o++] = req.net === 'mainnet' ? 0 : 1;
   buf.set(hexToBin(req.sellerPkh), o); o += 20;
   dv.setBigUint64(o, BigInt(req.sats)); o += 8;
@@ -234,7 +261,8 @@ export function encodeRequest(req: PaymentRequest): string {
 
 export function decodeRequest(code: string): PaymentRequest {
   const buf = fromB64url(code);
-  if (buf.length < 41 || buf[0] !== 3) throw new Error('This payment link is broken. Ask the seller to send it again.');
+  if (buf.length < 41 || (buf[0] !== 3 && buf[0] !== 13)) throw new Error('This payment link is broken. Ask the seller to send it again.');
+  const v: 1 | 2 = buf[0] === 13 ? 2 : 1;
   const dv = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
   let o = 1;
   const net: Net = buf[o++] === 0 ? 'mainnet' : 'chipnet';
@@ -245,7 +273,7 @@ export function decodeRequest(code: string): PaymentRequest {
   const itemLen = buf[o++];
   const item = binToUtf8(buf.slice(o, o + itemLen)) || 'Order'; o += itemLen;
   const price = binToUtf8(buf.slice(o)) || undefined;
-  return { net, sellerPkh, sats, item, price, windowBlocks, rid };
+  return { v, net, sellerPkh, sats, item, price, windowBlocks, rid };
 }
 
 // ---------- payment note (OP_RETURN in the lock tx) ----------
@@ -289,7 +317,7 @@ export function parseNote(lockingBytecode: Uint8Array): PaymentNote | null {
 
 export function orderFromRequest(req: PaymentRequest, note: PaymentNote): Order {
   return {
-    v: 1, net: req.net, buyerPkh: note.buyerPkh, sellerPkh: req.sellerPkh, releaseHash: note.releaseHash,
+    v: req.v ?? ORDER_VERSION, net: req.net, buyerPkh: note.buyerPkh, sellerPkh: req.sellerPkh, releaseHash: note.releaseHash,
     refundAfter: note.refundAfter, maxFee: MAX_FEE, sats: req.sats, item: req.item, price: req.price, created: 0,
   };
 }
@@ -304,7 +332,7 @@ export function encodeWaybill(order: Order): string {
   const buf = new Uint8Array(1 + 1 + 20 + 20 + 4 + 2 + 8 + 32 + 1 + item.length + price.length);
   const dv = new DataView(buf.buffer);
   let o = 0;
-  buf[o++] = 4;
+  buf[o++] = order.v === 2 ? 14 : 4;
   buf[o++] = order.net === 'mainnet' ? 0 : 1;
   buf.set(hexToBin(order.buyerPkh), o); o += 20;
   buf.set(hexToBin(order.sellerPkh), o); o += 20;
@@ -320,7 +348,8 @@ export function encodeWaybill(order: Order): string {
 
 export function decodeWaybill(code: string): Order {
   const buf = fromB64url(code);
-  if (buf.length < 89 || buf[0] !== 4) throw new Error('This waybill code is broken.');
+  if (buf.length < 89 || (buf[0] !== 4 && buf[0] !== 14)) throw new Error('This waybill code is broken.');
+  const v: 1 | 2 = buf[0] === 14 ? 2 : 1;
   const dv = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
   let o = 1;
   const net: Net = buf[o++] === 0 ? 'mainnet' : 'chipnet';
@@ -333,5 +362,5 @@ export function decodeWaybill(code: string): Order {
   const itemLen = buf[o++] ?? 0;
   const item = binToUtf8(buf.slice(o, o + itemLen)) || 'Order'; o += itemLen;
   const price = binToUtf8(buf.slice(o)) || undefined;
-  return { v: 1, net, buyerPkh, sellerPkh, releaseHash, refundAfter, maxFee, sats, item, price, created: 0 };
+  return { v, net, buyerPkh, sellerPkh, releaseHash, refundAfter, maxFee, sats, item, price, created: 0 };
 }

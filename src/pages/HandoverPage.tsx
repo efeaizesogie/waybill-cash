@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { type Order, secretMatches } from '../lib/waybill';
+import { type Order, secretMatches, sellerPayout } from '../lib/waybill';
 import { useStatus } from '../lib/useStatus';
 import { release, explorerTx, SETTLE_STEPS, type SettleStep } from '../lib/chain';
 import { friendlyError } from '../lib/errors';
@@ -76,7 +76,7 @@ export function HandoverPage({ order: routeOrder, secret }: { order: Order | nul
               />
             ) : (
               <>
-                <p className="stub-lead">The code is valid. Confirming pays the seller {formatBch(Number(status.utxo.satoshis) - 500)}.</p>
+                <p className="stub-lead">The code is valid. Confirming pays the seller {formatBch(sellerPayout(status.utxo.satoshis, order.v))}.</p>
                 <button className="btn btn-primary btn-block" onClick={confirm}>Confirm handover and pay seller</button>
               </>
             )}

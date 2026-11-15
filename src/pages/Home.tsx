@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useWallet } from '../lib/walletContext';
 import { type Currency, type Rates, getRates, toSats, formatMoney, formatBch } from '../lib/price';
-import { pkhFromAddress, netFromAddress, decodeOrder, newRequestId } from '../lib/waybill';
+import { pkhFromAddress, netFromAddress, decodeOrder, newRequestId, sellerPayout, platformFee, ORDER_VERSION } from '../lib/waybill';
 import { buyerIdentity, scanWallet } from '../lib/wallet';
 import { useLock, LockProgress } from '../components/LockProgress';
 import { ErrorNote } from '../components/Progress';
@@ -35,6 +35,7 @@ function useOrderFields() {
   const sats = useMemo(() => toSats(parseFloat(amount), cur, rates), [amount, cur, rates]);
   const tooSmall = sats !== null && sats < MIN_SATS;
   const price = cur === 'BCH' || !amount ? undefined : formatMoney(parseFloat(amount), cur);
+  const receivePrice = cur === 'BCH' || !amount ? undefined : formatMoney(parseFloat(amount) * 0.995, cur);
   const check = (what: string) => {
     if (!item.trim()) return `Say what ${what}, so the other side recognises the order.`;
     if (!sats || tooSmall) return `Enter an amount of at least ${formatBch(MIN_SATS)}.`;
@@ -76,7 +77,7 @@ function useOrderFields() {
       </label>
     </>
   );
-  return { item, sats, price, windowBlocks, check, fields };
+  return { item, sats, price, receivePrice, windowBlocks, check, fields };
 }
 
 /** Seller creates the waybill and sends the link to the buyer. No wallet connection needed. */
@@ -152,6 +153,12 @@ function SellForm() {
           </span>
         )}
       </label>
+      {f.sats ? (
+        <p className="hint fee-line">
+          You receive {f.price ? `about ${f.receivePrice}` : formatBch(sellerPayout(f.sats, ORDER_VERSION))} when the buyer confirms delivery.
+          {platformFee(f.sats, ORDER_VERSION) > 0n ? ' Waybill keeps 0.5%, only on completed orders. Refunds are free.' : ' No fee on orders this small.'}
+        </p>
+      ) : null}
       {error && <p className="form-error" role="alert">{error}</p>}
       <button className="btn btn-primary btn-block" type="submit">Create payment link</button>
     </form>

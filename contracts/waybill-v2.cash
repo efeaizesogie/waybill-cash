@@ -1,0 +1,40 @@
+pragma cashscript ^0.14.0;
+
+// Waybill v2: pay-on-delivery escrow with a 0.5% platform fee.
+//
+// Same as v1, plus: when the buyer releases the money, 0.5% of the locked amount goes to the
+// Waybill developer (feePkh), taken out of the seller's amount. Refunds carry no fee.
+// Orders too small for the fee to clear the dust limit (546 sats) pay no fee.
+contract WaybillV2(
+    bytes20 buyerPkh,
+    bytes20 sellerPkh,
+    bytes32 releaseHash,
+    int refundAfter,
+    int maxFee,
+    bytes20 feePkh
+) {
+    function release(bytes secret) {
+        require(sha256(secret) == releaseHash);
+        require(tx.inputs.length == 1);
+        int amount = tx.inputs[0].value;
+        int fee = amount / 200;
+        require(tx.outputs[0].lockingBytecode == new LockingBytecodeP2PKH(sellerPkh));
+        if (fee >= 546) {
+            require(tx.outputs.length == 2);
+            require(tx.outputs[1].lockingBytecode == new LockingBytecodeP2PKH(feePkh));
+            require(tx.outputs[1].value >= fee);
+            require(tx.outputs[0].value >= amount - fee - maxFee);
+        } else {
+            require(tx.outputs.length == 1);
+            require(tx.outputs[0].value >= amount - maxFee);
+        }
+    }
+
+    function refund() {
+        require(tx.time >= refundAfter);
+        require(tx.inputs.length == 1);
+        require(tx.outputs.length == 1);
+        require(tx.outputs[0].lockingBytecode == new LockingBytecodeP2PKH(buyerPkh));
+        require(tx.outputs[0].value >= tx.inputs[0].value - maxFee);
+    }
+}

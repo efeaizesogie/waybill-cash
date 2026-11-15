@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import type { Order } from '../lib/waybill';
-import { addressFromPkh } from '../lib/waybill';
+import { addressFromPkh, platformFee, sellerPayout } from '../lib/waybill';
 import { formatBch } from '../lib/price';
 import type { Status } from '../lib/chain';
 import { blocksToTime } from '../lib/chain';
@@ -49,6 +49,12 @@ export function Ticket({ order, status, height, children }: {
             <dt>Refunds buyer</dt>
             <dd className="mono">{short(addressFromPkh(order.buyerPkh, order.net))}</dd>
           </div>
+          {platformFee(order.sats, order.v) > 0n && (
+            <div>
+              <dt>Seller receives (after 0.5% fee)</dt>
+              <dd className="mono">{formatBch(sellerPayout(order.sats, order.v))}</dd>
+            </div>
+          )}
           <div>
             <dt>Refund opens</dt>
             <dd className="mono" title={`Block ${order.refundAfter.toLocaleString()}`}>

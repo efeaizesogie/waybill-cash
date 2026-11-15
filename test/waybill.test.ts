@@ -164,7 +164,7 @@ describe('seller request, payment note and waybill link', () => {
     const w = await import('../src/lib/waybill');
     const req = { net: 'chipnet' as const, sellerPkh: pkh(2), sats: 123_456, item: 'Ankara two-piece, size M', price: '₦25,000', windowBlocks: 432, rid: w.newRequestId() };
     const back = w.decodeRequest(w.encodeRequest(req));
-    expect(back).toEqual(req);
+    expect(back).toEqual({ ...req, v: 2 });
     expect(w.encodeRequest(req).length).toBeLessThan(160);
   });
 
