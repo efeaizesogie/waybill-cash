@@ -204,6 +204,10 @@ input::placeholder { color: var(--color-muted); }
 /* ---------- footer ---------- */
 .footer { padding-block: var(--space-xl) var(--space-2xl); border-top: var(--rule-hair) solid var(--color-rule); color: var(--color-muted); font-size: var(--text-sm); display: grid; gap: var(--space-sm); }
 .footer-links { display: flex; flex-wrap: wrap; gap: var(--space-lg); }
+.disclaimer { display: grid; gap: var(--space-xs); max-width: 72ch; padding: var(--space-md); border: var(--rule-hair) solid var(--color-rule); border-radius: var(--radius-input); background: var(--color-paper-2); color: var(--color-ink-2); scroll-margin-top: var(--space-xl); }
+.disclaimer-title { font-family: var(--font-body); font-size: var(--text-md); font-weight: 700; color: var(--color-ink); }
+.disclaimer strong { color: var(--color-ink); }
+.ticket-stub a { color: inherit; }
 
 @media (max-width: 60rem) {
   .gstep { grid-template-columns: auto minmax(0, 1fr); }

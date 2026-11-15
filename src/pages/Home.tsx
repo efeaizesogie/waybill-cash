@@ -156,7 +156,8 @@ function SellForm() {
       {f.sats ? (
         <p className="hint fee-line">
           You receive {f.price ? `about ${f.receivePrice}` : formatBch(sellerPayout(f.sats, ORDER_VERSION))} when the buyer confirms delivery.
-          {platformFee(f.sats, ORDER_VERSION) > 0n ? ' Waybill keeps 0.5%, only on completed orders. Refunds are free.' : ' No fee on orders this small.'}
+          {platformFee(f.sats, ORDER_VERSION) > 0n ? ' Waybill keeps 0.5%, only on completed orders. Refunds are free.' : ' No fee on orders this small.'}{' '}
+          <a href="#fees" onClick={(e) => { e.preventDefault(); document.getElementById('fees')?.scrollIntoView({ behavior: 'smooth' }); }}>Fees and risks</a>
         </p>
       ) : null}
       {error && <p className="form-error" role="alert">{error}</p>}

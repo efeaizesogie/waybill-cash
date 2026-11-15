@@ -121,7 +121,9 @@ export function RequestPage({ code }: { code: string }) {
                   <button type="button" className="btn btn-quiet" onClick={wallet.openFaucet}>Get free test coins</button>
                 )}
                 <p className="hint">
-                  {req.v === 2 && "You pay the listed price. Waybill's 0.5% fee comes out of the seller's side, only when you confirm delivery. "}Check the seller's address with them before paying: <span className="mono addr-full">{seller}</span>
+                  {req.v === 2 && "You pay the listed price. Waybill's 0.5% fee comes out of the seller's side, only when you confirm delivery. "}
+                  <a href="#fees" onClick={(e) => { e.preventDefault(); document.getElementById('fees')?.scrollIntoView({ behavior: 'smooth' }); }}>Fees and risks</a>.{' '}
+                  Check the seller's address with them before paying: <span className="mono addr-full">{seller}</span>
                 </p>
               </>
             )}

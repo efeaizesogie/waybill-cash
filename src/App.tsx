@@ -168,8 +168,27 @@ export default function App() {
           Waybill is open source and holds nothing. Every order is a Bitcoin Cash contract that can only pay the seller
           (with the buyer's code) or refund the buyer (after the deadline).
         </p>
+        <section className="disclaimer" id="fees" aria-labelledby="fees-title">
+          <h2 id="fees-title" className="disclaimer-title">Fees and risks</h2>
+          <p>
+            <strong>Platform fee.</strong> Sellers pay 0.5% of each completed order. The contract takes it from the seller's
+            amount when the buyer confirms delivery and sends it to the Waybill developer. Buyers pay the listed price. There is no
+            fee on refunds, or on orders under about 109,000 satoshis, where 0.5% would be below the network's minimum payment.
+          </p>
+          <p>
+            <strong>Network fees.</strong> Locking costs a small Bitcoin Cash network fee paid by the buyer's wallet. Paying the
+            seller or refunding costs about 500 satoshis, taken from the locked amount. Seller links also send the seller a
+            546-satoshi notice so their page can spot the payment.
+          </p>
+          <p>
+            <strong>Use at your own risk.</strong> Waybill is new, experimental software built for BCH BLAZE 2026, provided as is
+            with no warranty. Bitcoin Cash payments can't be reversed, and nobody, including us, can recover a lost release code or
+            override the contract. Prices in naira or dollars are estimates at the live rate. Check the seller's address and start
+            with small amounts.
+          </p>
+        </section>
         <p className="footer-links">
-          <a href="https://github.com/efeaizesogie/waybill-cash/blob/main/contracts/waybill.cash">Read the contract</a>
+          <a href="https://github.com/efeaizesogie/waybill-cash/blob/main/contracts/waybill-v2.cash">Read the contract</a>
           <a href="https://github.com/efeaizesogie/waybill-cash">Source code</a>
           <a href={NET === 'mainnet' ? '?net=chipnet' : './'}>{NET === 'mainnet' ? 'Use Chipnet test coins' : 'Back to mainnet'}</a>
         </p>
