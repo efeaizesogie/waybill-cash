@@ -5,7 +5,7 @@ export function friendlyError(e: unknown): { message: string; detail?: string } 
   const has = (re: RegExp) => re.test(raw);
 
   // Our own messages are already written for people: pass them through.
-  if (has(/^(Not enough|Your wallet didn|You declined|That is|Use a regular|This (payment|waybill|handover) (link|code) is broken|Enter an amount|Say what)/)) return { message: raw };
+  if (has(/^(Not enough|Your wallet didn|You declined|That is|Use a regular|Use a Chipnet|This browser already|The test-coin faucet|This (payment|waybill|handover) (link|code) is broken|Enter an amount|Say what)/)) return { message: raw };
 
   if (has(/timed out|timeout/i)) return { message: 'The Bitcoin Cash network is slow to answer. Check your connection and try again.', detail: raw };
   if (has(/missing or already spent|missingorspent|bad-txns-inputs-missingorspent|txn-mempool-conflict|UTXO not found/i))

@@ -161,6 +161,12 @@ function TryForm() {
   const [balance, setBalance] = useState<bigint | null>(null);
   const connected = wallet.state === 'connected' && !!wallet.manager;
 
+  const [funded, setFunded] = useState(0);
+  useEffect(() => {
+    const on = () => setTimeout(() => setFunded((n) => n + 1), 3000);
+    window.addEventListener('waybill:funded', on);
+    return () => window.removeEventListener('waybill:funded', on);
+  }, []);
   useEffect(() => {
     if (!connected || !wallet.manager) return;
     let alive = true;
@@ -170,7 +176,7 @@ function TryForm() {
     return () => {
       alive = false;
     };
-  }, [connected, wallet.manager, wallet.net]);
+  }, [connected, wallet.manager, wallet.net, funded]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -194,7 +200,10 @@ function TryForm() {
 
   return (
     <form className="order-form" onSubmit={submit} noValidate>
-      <p className="hint">You play buyer and seller with your own wallet, so a full run only costs network fees (under ₦5).</p>
+      <p className="hint">
+        You play buyer and seller with your own wallet, so a full run only costs network fees (under ₦5). No BCH?{' '}
+        <button type="button" className="link-btn" onClick={wallet.openFaucet}>Get free test coins</button>
+      </p>
       {f.fields('What are you buying?', 'Refund me if it hasn’t arrived in')}
       {error && <p className="form-error" role="alert">{error}</p>}
       {lock.error && <ErrorNote message={lock.error.message} detail={lock.error.detail} />}

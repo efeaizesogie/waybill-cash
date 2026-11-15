@@ -3,6 +3,7 @@ import { useWizardConnect } from '@wizardconnect/react';
 import { type Net, type Order, decodeOrder, decodeSecret, decodeHandover } from './lib/waybill';
 import { ConnectDialog } from './components/ConnectDialog';
 import { Scanner } from './components/Scanner';
+import { FaucetDialog } from './components/FaucetDialog';
 import { Banner } from './components/Banner';
 import { Home } from './pages/Home';
 import { OrderPage, WaybillPage } from './pages/OrderPage';
@@ -65,6 +66,8 @@ export default function App() {
   });
   const [showQr, setShowQr] = useState(false);
   const [scanning, setScanning] = useState(false);
+  const [faucetOpen, setFaucetOpen] = useState(() => new URLSearchParams(location.search).get('faucet') === '1');
+  const openFaucet = useCallback(() => setFaucetOpen(true), []);
   const openScanner = useCallback(() => setScanning(true), []);
   const closeScanner = useCallback(() => setScanning(false), []);
   // A stale saved session can sit in "connecting" with no QR to show. Tapping Connect then
@@ -92,7 +95,7 @@ export default function App() {
   }, [wc.state]);
 
   return (
-    <WalletContext.Provider value={{ ...wc, net: NET, openConnect: connect, openScanner }}>
+    <WalletContext.Provider value={{ ...wc, net: NET, openConnect: connect, openScanner, openFaucet }}>
       <Banner />
       <header className="topbar container">
         <a href="#/" className="wordmark" aria-label="Waybill home">
@@ -130,7 +133,10 @@ export default function App() {
         <div className="net-strip">
           <div className="container net-strip-row">
             <span>You're using Chipnet test coins.</span>
-            <a href={location.pathname}>Switch to real BCH</a>
+            <span className="net-strip-actions">
+              <button className="link-btn" onClick={openFaucet}>Get free test coins</button>
+              <a href={location.pathname}>Switch to real BCH</a>
+            </span>
           </div>
         </div>
       )}
@@ -155,6 +161,7 @@ export default function App() {
         />
       )}
       {scanning && <Scanner onClose={closeScanner} />}
+      {faucetOpen && <FaucetDialog onClose={() => setFaucetOpen(false)} />}
 
       <footer className="footer container">
         <p>

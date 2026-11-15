@@ -31,7 +31,8 @@ body { font-stretch: 100%; }
 .topbar-right { display: flex; gap: var(--space-sm); align-items: center; }
 .net-strip-row { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--space-2xs) var(--space-md); }
 .net-strip { padding-block: var(--space-xs); font-size: var(--text-sm); color: var(--color-ink-2); background: color-mix(in oklab, var(--color-warn) 12%, var(--color-paper)); border-block: var(--rule-hair) solid color-mix(in oklab, var(--color-warn) 30%, var(--color-paper)); }
-.net-strip a { font-weight: 600; color: var(--color-ink); }
+.net-strip a, .net-strip .link-btn { font-weight: 600; color: var(--color-ink); }
+.net-strip-actions { display: flex; flex-wrap: wrap; gap: var(--space-2xs) var(--space-md); }
 .conn-error { background: color-mix(in oklab, var(--color-error) 10%, var(--color-paper)); border-color: color-mix(in oklab, var(--color-error) 30%, var(--color-paper)); color: var(--color-ink); }
 .conn-error .link-btn { font-weight: 600; }
 .topbar .btn { white-space: nowrap; }

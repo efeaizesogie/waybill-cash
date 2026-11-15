@@ -48,7 +48,7 @@ npm test
 npm run dev
 ```
 
-Add `?net=chipnet` to the URL to use Chipnet test coins.
+Add `?net=chipnet` to the URL to use Chipnet test coins. On Chipnet, tap **Get free test coins** to receive 0.01 test BCH from the built-in faucet (a Chipnet-only key in `src/lib/faucet.ts`; refill it by sending Chipnet coins to `bchtest:qqeps7k0vwmpncfggeks3z26fzl6g3csgqvdszr3f6`).
 
 ## Stack
 

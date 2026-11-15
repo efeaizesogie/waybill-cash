@@ -15,6 +15,12 @@ export function RequestPage({ code }: { code: string }) {
   const lock = useLock();
   const [balance, setBalance] = useState<bigint | null>(null);
   const isConnected = wallet.state === 'connected' && !!wallet.manager;
+  const [funded, setFunded] = useState(0);
+  useEffect(() => {
+    const on = () => setTimeout(() => setFunded((n) => n + 1), 3000);
+    window.addEventListener('waybill:funded', on);
+    return () => window.removeEventListener('waybill:funded', on);
+  }, []);
   useEffect(() => {
     if (!isConnected || !wallet.manager || !req) return;
     let alive = true;
@@ -22,7 +28,7 @@ export function RequestPage({ code }: { code: string }) {
     return () => {
       alive = false;
     };
-  }, [isConnected, wallet.manager, req]);
+  }, [isConnected, wallet.manager, req, funded]);
 
   if (!req) {
     return (
@@ -110,6 +116,9 @@ export function RequestPage({ code }: { code: string }) {
                     Your wallet: {formatBch(balance)} {req.net === 'chipnet' ? '(Chipnet)' : ''}
                     {balance < BigInt(req.sats) ? ', not enough for this order' : ''}
                   </p>
+                )}
+                {req.net === 'chipnet' && ((balance !== null && balance < BigInt(req.sats) + 2000n) || lock.error?.message.startsWith('Not enough')) && (
+                  <button type="button" className="btn btn-quiet" onClick={wallet.openFaucet}>Get free test coins</button>
                 )}
                 <p className="hint">
                   Check the seller's address with them before paying: <span className="mono addr-full">{seller}</span>

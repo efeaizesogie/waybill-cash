@@ -7,6 +7,7 @@ export interface WalletCtx extends Wc {
   net: Net;
   openConnect: () => void;
   openScanner: () => void;
+  openFaucet: () => void;
 }
 
 export const WalletContext = createContext<WalletCtx | null>(null);
